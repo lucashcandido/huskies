@@ -1,96 +1,139 @@
-// Erzeugt fiktive Beispieldaten zum Ausprobieren der App.
-import { uid } from './store.js';
+// Erzeugt fiktive Beispieldaten (zum Vorstellen und Ausprobieren).
+// Alle erzeugten Einträge tragen demo: true und lassen sich über
+// „⋯ Daten → Beispieldaten entfernen“ wieder vollständig löschen.
+
 import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, routePoints } from './football.js';
 import { buildDefense } from './defense.js';
 
 const FIRST = ['Lukas', 'Jonas', 'Ben', 'Elias', 'Noah', 'Paul', 'Leon', 'Finn', 'Luis', 'Felix', 'Henry', 'Emil', 'Anton', 'Theo', 'Mats', 'Jakob',
-  'Moritz', 'David', 'Samuel', 'Malik', 'Niklas', 'Tim', 'Ole', 'Karim', 'Milan', 'Jannik', 'Linus', 'Tom', 'Erik', 'Yusuf', 'Hannes', 'Kofi', 'Marlon', 'Can'];
+  'Moritz', 'David', 'Samuel', 'Malik', 'Niklas', 'Tim', 'Ole', 'Karim', 'Milan', 'Jannik', 'Linus', 'Tom', 'Erik', 'Yusuf', 'Hannes', 'Kofi',
+  'Marlon', 'Can', 'Maximilian', 'Julian', 'Leo', 'Oskar', 'Vincent', 'Rafael', 'Jason', 'Aaron', 'Mika', 'Tobias', 'Dominik', 'Kevin', 'Marvin',
+  'Dennis', 'Patrick', 'Sebastian', 'Florian', 'Marco', 'Daniel', 'Lennard', 'Jannis', 'Nico', 'Robin', 'Simon', 'Fabian', 'Joel', 'Emre', 'Luca'];
 const LAST = ['Becker', 'Schulz', 'Hoffmann', 'Krüger', 'Wagner', 'Neumann', 'Braun', 'Wolf', 'Schröder', 'Zimmermann', 'Hartmann', 'Lange', 'Werner',
-  'Krause', 'Meier', 'Lehmann', 'Köhler', 'Herrmann', 'Walter', 'Peters', 'Möller', 'Jansen', 'Brandt', 'Haas', 'Vogel', 'Friedrich', 'Keller', 'Günther', 'Frank', 'Berger', 'Kaiser', 'Fuchs', 'Engel', 'Sommer'];
+  'Krause', 'Meier', 'Lehmann', 'Köhler', 'Herrmann', 'Walter', 'Peters', 'Möller', 'Jansen', 'Brandt', 'Haas', 'Vogel', 'Friedrich', 'Keller',
+  'Günther', 'Frank', 'Berger', 'Kaiser', 'Fuchs', 'Engel', 'Sommer', 'Dietrich', 'Ziegler', 'Kuhn', 'Pohl', 'Albrecht', 'Schuster', 'Böhm',
+  'Winter', 'Roth', 'Busch', 'Graf', 'Seidel', 'Arnold', 'Lorenz', 'Ludwig', 'Jung', 'Hahn', 'Schubert', 'Vogt', 'Otto', 'Simon', 'Franke',
+  'Thomas', 'Scholz', 'Schmitz', 'Beck', 'Weiß', 'Lang', 'Ahmeti', 'Okafor', 'Yilmaz', 'Mensah', 'Kowalski', 'Nowak', 'Petrović', 'Rossi'];
 
-// Profile je Position: [Gewicht, 40yd, Shuffle, L-Cone, Broad, Vertical, MaxV]
+// Profil je Position (U19-Niveau): [Gewicht, 40yd, Shuffle, L-Cone, Broad, Vertical, MaxV]
 const PROFILE = {
-  QB: [80, 5.0, 4.6, 7.6, 235, 58, 28.5], RB: [80, 4.8, 4.45, 7.4, 250, 64, 30.5], WR: [74, 4.75, 4.4, 7.3, 252, 66, 31.0],
-  TE: [92, 5.05, 4.65, 7.7, 235, 58, 28.5], OL: [118, 5.6, 5.0, 8.3, 205, 44, 25.0], DL: [105, 5.3, 4.8, 8.0, 220, 50, 26.5],
-  LB: [88, 4.95, 4.55, 7.55, 240, 60, 29.0], CB: [73, 4.7, 4.35, 7.25, 255, 67, 31.2], S: [78, 4.8, 4.45, 7.4, 248, 64, 30.4],
+  QB: [80, 5.0, 4.6, 7.6, 235, 58, 28.5], RB: [80, 4.8, 4.45, 7.4, 250, 64, 30.5], FB: [92, 5.0, 4.6, 7.6, 238, 58, 28.8],
+  WR: [74, 4.75, 4.4, 7.3, 252, 66, 31.0], TE: [92, 5.05, 4.65, 7.7, 235, 58, 28.5], OL: [118, 5.6, 5.0, 8.3, 205, 44, 25.0],
+  DL: [105, 5.3, 4.8, 8.0, 220, 50, 26.5], LB: [88, 4.95, 4.55, 7.55, 240, 60, 29.0], CB: [73, 4.7, 4.35, 7.25, 255, 67, 31.2],
+  S: [78, 4.8, 4.45, 7.4, 248, 64, 30.4], K: [76, 5.1, 4.7, 7.7, 225, 52, 27.5], P: [80, 5.15, 4.75, 7.8, 222, 50, 27.2],
 };
-const MIX = { QB: 2, RB: 3, WR: 6, TE: 2, OL: 6, DL: 5, LB: 4, CB: 4, S: 2 };
+const MIX_FULL = { QB: 3, RB: 3, FB: 1, WR: 7, TE: 3, OL: 8, DL: 6, LB: 5, CB: 5, S: 3, K: 1, P: 1 };
+const MIX_SMALL = { QB: 2, RB: 2, WR: 4, TE: 1, OL: 5, DL: 4, LB: 3, CB: 3, S: 2 };
 
-export function demoData() {
-  let seed = 7;
-  const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+// Niveau je Altersklasse: Zeiten ×t, Sprünge ×j, Gewicht ×w, Max V ×v, Geburtsjahre
+export const LEVELS = {
+  youth:   { t: 1.17, j: 0.74, w: 0.62, v: 0.82, born: [2014, 2015], mix: MIX_SMALL },
+  junior:  { t: 1.07, j: 0.87, w: 0.84, v: 0.92, born: [2011, 2013], mix: MIX_FULL },
+  u20:     { t: 1.0,  j: 1.0,  w: 1.0,  v: 1.0,  born: [2007, 2010], mix: MIX_FULL },
+  senior:  { t: 0.975, j: 1.04, w: 1.06, v: 1.03, born: [1992, 2006], mix: { ...MIX_FULL, OL: 9, DL: 7, WR: 8 } },
+  prospect:{ t: 1.02, j: 0.97, w: 0.97, v: 0.98, born: [2008, 2010], mix: { QB: 1, RB: 2, WR: 3, TE: 1, OL: 2, DL: 2, LB: 2, CB: 2, S: 1 } },
+};
+/** Passendes Niveau aus dem Teamnamen raten */
+export function levelFor(name) {
+  const n = String(name).toLowerCase();
+  if (n.includes('prospect')) return 'prospect';
+  const m = /u\s?(\d{2})/.exec(n);
+  if (m) { const a = +m[1]; return a <= 13 ? 'youth' : a <= 17 ? 'junior' : 'u20'; }
+  if (/herren|senior|1\.|men/.test(n)) return 'senior';
+  return 'u20';
+}
+
+const DATES = ['2026-03-14', '2026-06-20', '2026-09-26'];
+const PLAYS = [
+  ['Smash vs Cover 2', 'doubles', 'cover2', { X: 'Hitch', H: 'Corner', Y: 'Corner', Z: 'Hitch', RB: 'Flat' }],
+  ['Four Verts vs Cover 3', 'doubles', 'cover3', { X: 'Go / Fade', H: 'Seam', Y: 'Seam', Z: 'Go / Fade', RB: 'Swing' }],
+  ['Mesh vs Cover 1', 'trips', 'cover1', { X: 'Drag', Y: 'Drag', H: 'Corner', Z: 'Go / Fade', RB: 'Angle' }],
+  ['Flood vs Cover 3', 'trips', 'cover3', { X: 'Post', Y: 'Flat', H: 'Out', Z: 'Go / Fade', RB: 'Swing' }],
+  ['Curl/Flat vs Cover 4', 'doubles', 'cover4', { X: 'Curl', H: 'Flat', Y: 'Seam', Z: 'Curl', RB: 'Angle' }],
+];
+
+/**
+ * Fiktive Daten für ein Team.
+ * @param team {id, name}; opts: {level, seed, plays, uid}
+ */
+export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 3, uid } = {}) {
+  const L = LEVELS[level] || LEVELS.u20;
+  let s = (seed * 9301 + 49297) % 233280 || 7;
+  const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
   const gauss = () => (rnd() + rnd() + rnd() - 1.5) / 1.5;
+  const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const used = new Set();
   const athletes = [];
-  let n = 0;
-  for (const [pos, count] of Object.entries(MIX)) {
+  for (const [pos, count] of Object.entries(L.mix)) {
     for (let i = 0; i < count; i++) {
       const [w, f, sh, lc, br, ve, mv] = PROFILE[pos];
       const talent = gauss();
-      const year = 2007 + Math.floor(rnd() * 3);
-      const dates = ['2026-03-14', '2026-06-20', '2026-09-26'];
-      const ms = dates.map((date, k) => {
-        const imp = k * 0.012;      // leichte Verbesserung über die Saison
-        const r = (base, spread, lowerBetter = true) => {
-          const v = base * (1 + (lowerBetter ? -1 : 1) * (talent * spread + imp) + gauss() * spread * 0.35);
-          return v;
-        };
-        return {
-          id: uid('m'), date,
-          weight: Math.round((w + gauss() * 8 + k * 0.8) * 10) / 10,
-          forty: Math.round(r(f, 0.04) * 100) / 100,
-          shuffle: Math.round(r(sh, 0.04) * 100) / 100,
-          lconeR: Math.round(r(lc, 0.035) * 100) / 100,
-          lconeL: Math.round(r(lc * 1.01, 0.035) * 100) / 100,
-          broad: Math.round(r(br, 0.06, false)),
-          vertical: Math.round(r(ve, 0.08, false) * 2) / 2,
-          maxVelocity: Math.round(r(mv, 0.04, false) * 10) / 10,
-        };
-      });
-      // nicht jede:r war bei jedem Test
-      if (rnd() < 0.25) ms.shift();
+      let first, last;
+      do { first = pick(FIRST); last = pick(LAST); } while (used.has(first + last));
+      used.add(first + last);
+      const year = L.born[0] + Math.floor(rnd() * (L.born[1] - L.born[0] + 1));
+      const r = (base, spread, k, lowerBetter = true) =>
+        base * (1 + (lowerBetter ? -1 : 1) * (talent * spread + k * 0.012) + gauss() * spread * 0.35);
+      let ms = DATES.map((date, k) => ({
+        id: 'm_' + date, date,
+        weight: Math.round((w * L.w + gauss() * 8 * L.w + k * 0.8) * 10) / 10,
+        forty: Math.round(r(f * L.t, 0.04, k) * 100) / 100,
+        shuffle: Math.round(r(sh * L.t, 0.04, k) * 100) / 100,
+        lconeR: Math.round(r(lc * L.t, 0.035, k) * 100) / 100,
+        lconeL: Math.round(r(lc * L.t * 1.01, 0.035, k) * 100) / 100,
+        broad: Math.round(r(br * L.j, 0.06, k, false)),
+        vertical: Math.round(r(ve * L.j, 0.08, k, false) * 2) / 2,
+        maxVelocity: Math.round(r(mv * L.v, 0.04, k, false) * 10) / 10,
+      }));
+      if (rnd() < 0.22) ms = ms.slice(1);                 // nicht jede:r war bei jedem Test
+      if (rnd() < 0.1) ms[ms.length - 1].vertical = null; // vereinzelt fehlende Werte
       athletes.push({
-        id: uid('ath') + n, firstName: FIRST[n % FIRST.length], lastName: LAST[(n * 7) % LAST.length],
+        id: uid('ath'), teamId: team.id, demo: true, firstName: first, lastName: last,
         birthDate: `${year}-${String(1 + Math.floor(rnd() * 12)).padStart(2, '0')}-${String(1 + Math.floor(rnd() * 28)).padStart(2, '0')}`,
         age: null, position: pos, notes: '', measurements: ms,
       });
-      n++;
     }
   }
-  const depth = {};
-  athletes.forEach((a, i) => {
-    depth[a.position] = (depth[a.position] || 0) + 1;
-    a.number = String(((i * 37) % 89) + 1);
-    a.depth = depth[a.position];
-  });
-  const fillSlots = (slots) => {
-    const used = new Set();
+  // Trikotnummern ohne Doppelte, grob nach Position
+  const RANGE = { QB: [1, 19], RB: [20, 49], FB: [30, 49], WR: [1, 19, 80, 89], TE: [80, 89, 40, 49], OL: [50, 79], DL: [90, 99, 50, 79],
+    LB: [40, 59, 90, 99], CB: [20, 39, 1, 19], S: [20, 49], K: [1, 19, 90, 99], P: [1, 19, 90, 99] };
+  const nums = new Set();
+  for (const a of athletes) {
+    const rg = RANGE[a.position] || [1, 99];
+    for (let t = 0; t < 200; t++) {
+      const part = rg.length > 2 && rnd() < 0.4 ? 2 : 0;
+      const n = rg[part] + Math.floor(rnd() * (rg[part + 1] - rg[part] + 1));
+      if (!nums.has(n)) { nums.add(n); a.number = String(n); break; }
+    }
+  }
+  // Personnel: Starter = schnellste 40-yd-Zeit je Position
+  const fortyOf = a => a.measurements[a.measurements.length - 1].forty ?? 99;
+  const fill = slots => {
+    const taken = new Set();
     return slots.map(sl => {
-      const m = athletes.filter(x => x.position === sl.pos && !used.has(x.id)).sort((a, b) => a.depth - b.depth)[0];
-      if (m) used.add(m.id);
+      const m = athletes.filter(x => x.position === sl.pos && !taken.has(x.id)).sort((a, b) => fortyOf(a) - fortyOf(b))[0];
+      if (m) taken.add(m.id);
       return { ...sl, athleteId: m ? m.id : null };
     });
   };
-  const off11 = { id: uid('per'), side: 'offense', preset: '11', name: '11 Personnel – Starter', slots: fillSlots(OFFENSE_PERSONNEL['11'].slots), notes: '' };
-  const defNickel = { id: uid('per'), side: 'defense', preset: 'nickel', name: 'Nickel – Starter', slots: fillSlots(DEFENSE_PERSONNEL.nickel.slots), notes: '' };
+  const off11 = { id: uid('per'), teamId: team.id, demo: true, side: 'offense', preset: '11', name: '11 Personnel – Starter', slots: fill(OFFENSE_PERSONNEL['11'].slots), notes: '' };
+  const defNickel = { id: uid('per'), teamId: team.id, demo: true, side: 'defense', preset: 'nickel', name: 'Nickel – Starter', slots: fill(DEFENSE_PERSONNEL.nickel.slots), notes: '' };
+  const personnel = [off11, defNickel];
+  if (L.mix.FB) personnel.push({ id: uid('per'), teamId: team.id, demo: true, side: 'offense', preset: '21', name: '21 Personnel – I-Form', slots: fill(OFFENSE_PERSONNEL['21'].slots), notes: '' });
+  if (L.mix.LB >= 3) personnel.push({ id: uid('per'), teamId: team.id, demo: true, side: 'defense', preset: 'base43', name: 'Base 4-3', slots: fill(DEFENSE_PERSONNEL.base43.slots), notes: '' });
 
-  const mkPlay = (name, formation, concept, routes) => {
+  const playList = PLAYS.slice(0, plays).map(([name, formation, concept, routes]) => {
     const offense = formationPlayers(formation);
-    for (const [role, r] of Object.entries(routes)) {
+    for (const [role, rt] of Object.entries(routes)) {
       const p = offense.find(x => x.role === role);
-      if (p) { p.route = routePoints(r, p); p.routeName = r; }
+      if (p) { p.route = routePoints(rt, p); p.routeName = rt; }
     }
     return {
-      id: uid('play'), name, formation, offense, offensePersonnelId: off11.id, concept, defensePreset: 'auto',
-      defensePersonnelId: defNickel.id, defenseLocked: false, defense: buildDefense(offense, concept, 'nickel').players, duration: 4,
-      notes: '',
+      id: uid('play'), teamId: team.id, demo: true, name, formation, offense, offensePersonnelId: off11.id, concept,
+      defensePreset: 'auto', defensePersonnelId: defNickel.id, defenseLocked: false,
+      defense: buildDefense(offense, concept, 'nickel').players, duration: 4,
+      notes: 'Beispiel-Spielzug',
     };
-  };
-  const plays = [
-    mkPlay('Smash vs Cover 2', 'doubles', 'cover2', { X: 'Hitch', H: 'Corner', Y: 'Corner', Z: 'Hitch', RB: 'Flat' }),
-    mkPlay('Four Verts vs Cover 3', 'doubles', 'cover3', { X: 'Go / Fade', H: 'Seam', Y: 'Seam', Z: 'Go / Fade', RB: 'Swing' }),
-    mkPlay('Mesh vs Cover 1', 'trips', 'cover1', { X: 'Drag', Y: 'Drag', H: 'Corner', Z: 'Go / Fade', RB: 'Angle' }),
-  ];
-  const team = { id: uid('team'), name: 'U19', order: 0 };
-  for (const x of [...athletes, off11, defNickel, ...plays]) x.teamId = team.id;
-  return { version: 1, teams: [team], athletes, rosters: [], personnel: [off11, defNickel], plays };
+  });
+  return { athletes, personnel, plays: playList };
 }

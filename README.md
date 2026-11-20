@@ -21,7 +21,7 @@ Alle Coaches arbeiten auf denselben Daten im privaten Repo **`huskies-data`** �
 
 Abgleich: Änderungen werden nach 1,5 s hochgeladen, alle 45 s und beim Zurückkehren in die App wird geladen. Pro Feld gewinnt die neuere Änderung, Messungen werden pro Messtag zusammengeführt – zwei Coaches an verschiedenen Stationen überschreiben sich nicht. Offline erfasste Werte werden nachgereicht. Jeder Commit trägt den Namen des Coaches; über den Git-Verlauf lässt sich jeder Stand wiederherstellen. Läuft der Token ab, genügt es, mit dem neuen Token einen Code neu zu erzeugen und `access.json` zu ersetzen – Geräte mit dem alten Code verbinden sich nur neu, wenn derselbe Code weiterverwendet wird.
 
-Über **⋯ Daten** gibt es zusätzlich Backup (JSON), CSV-Export für Excel und Beispieldaten. Ohne Verbindung („nur auf diesem Gerät“) bleibt alles im `localStorage`.
+Über **⋯ Daten** gibt es zusätzlich Backup (JSON), CSV-Export für Excel sowie fiktive Beispieldaten für das aktuelle Team. Beispieldaten sind mit `demo: true` markiert und lassen sich dort mit „Alle Beispieldaten entfernen“ restlos löschen – echte Einträge bleiben erhalten. Ohne Verbindung („nur auf diesem Gerät“) bleibt alles im `localStorage`.
 
 ## Lokal starten
 

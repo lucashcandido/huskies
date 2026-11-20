@@ -1,8 +1,8 @@
-import { db, exportJSON, importJSON, resetAll, replaceState, subscribe } from './store.js';
+import { db, exportJSON, importJSON, resetAll, subscribe, uid, COLLS } from './store.js';
 import { modal, toast, download, pickFile, confirmDialog, esc } from './ui.js';
 import { today } from './metrics.js';
 import { measurementsCSV } from './views/athletes.js';
-import { demoData } from './demo.js';
+import { demoTeam } from './demo.js';
 import * as sync from './sync.js';
 import { teams, currentTeam, setTeam, clearTeam, createTeam, renameTeam, teamUsage, untaggedCount, adoptUntagged } from './team.js';
 import { persist } from './store.js';
@@ -92,6 +92,9 @@ function renderTeamPicker(root) {
   const pick = id => {
     setTeam(id); localStorage.setItem('huskies.lastTeam', id);
     const loose = untaggedCount();
+    // Detailseiten (z. B. ein Spielzug) gehören zum alten Team → zur Übersicht des Bereichs
+    const base = (location.hash.replace(/^#\/?/, '').split('/')[0]) || 'athletes';
+    if (location.hash !== '#/' + base) history.replaceState(null, '', '#/' + base);
     route();
     if (loose) confirmDialog(`Es gibt ${loose} Einträge ohne Team (aus einer älteren Version). Dem Team „${currentTeam().name}“ zuordnen?`,
       () => { adoptUntagged(id); persist(); route(); toast('Zugeordnet'); }, 'Zuordnen');
@@ -221,6 +224,17 @@ function openAccessDialog(fresh = false) {
   };
 }
 
+// ---------- Beispieldaten ----------
+const demoCount = () => ['athletes', 'personnel', 'plays'].reduce((n, c) => n + db()[c].filter(x => x.demo).length, 0);
+function removeDemo() {
+  const s = db();
+  const gone = new Set(s.athletes.filter(a => a.demo).map(a => a.id));
+  for (const c of ['athletes', 'personnel', 'plays']) s[c] = s[c].filter(x => !x.demo);
+  // Verweise echter Einträge auf entfernte Beispielspieler lösen
+  s.personnel.forEach(p => p.slots.forEach(sl => { if (gone.has(sl.athleteId)) sl.athleteId = null; }));
+  persist();
+}
+
 // ---------- Datenmenü ----------
 function openDataMenu() {
   const s = db();
@@ -248,7 +262,8 @@ function openDataMenu() {
         <button data-a="import">Backup laden – ersetzt alles</button>
         <button data-a="merge">Backup hinzufügen – zusammenführen</button>
         <button data-a="csv">Messwerte als CSV (Excel) exportieren</button>
-        <button data-a="demo">Beispieldaten laden</button>
+        <button data-a="demo">Beispieldaten zu ${esc(currentTeam()?.name || 'einem neuen Team „U19“')} hinzufügen</button>
+        ${demoCount() ? `<button data-a="undemo">Alle Beispieldaten entfernen (${demoCount()} Einträge)</button>` : ''}
         <button class="danger" data-a="reset">Alle Daten löschen</button>
       </div>
       ${cfg ? '<p class="small muted" style="margin-bottom:0">Achtung: Laden, Beispieldaten und Löschen wirken über die Synchronisierung auf alle Coaches.</p>' : ''}`,
@@ -274,10 +289,19 @@ function openDataMenu() {
           if (a === 'import' && cfg) confirmDialog('Das Backup ersetzt die Daten für ALLE Coaches. Fortfahren?', go, 'Ersetzen'); else go();
         }
         if (a === 'demo') {
-          const go = () => { const d = demoData(); replaceState(d); setTeam(d.teams[0].id); toast('Beispieldaten geladen'); close(); route(); };
-          if (db().athletes.length || cfg) confirmDialog(`Beispieldaten ersetzen alle vorhandenen Daten${cfg ? ' – für alle Coaches' : ''}. Fortfahren?`, go, 'Ersetzen');
-          else go();
+          const go = () => {
+            const team = currentTeam() || createTeam('U19');
+            setTeam(team.id);
+            const d = demoTeam(team, { seed: Date.now() % 9973, uid });
+            for (const c of ['athletes', 'personnel', 'plays']) db()[c].push(...d[c]);
+            persist();
+            toast(`${d.athletes.length} fiktive Spieler hinzugefügt`); close(); route();
+          };
+          confirmDialog(`Fiktive Spieler mit Combine-Werten, Personnel und Spielzügen zu „${currentTeam()?.name || 'U19'}“ hinzufügen?${cfg ? ' Alle Coaches sehen sie.' : ''} Sie lassen sich hier jederzeit wieder entfernen.`, go, 'Hinzufügen');
         }
+        if (a === 'undemo') confirmDialog(`Alle Beispieldaten (${demoCount()} Einträge) in allen Teams entfernen? Echte Daten bleiben erhalten.`, () => {
+          removeDemo(); close(); route(); toast('Beispieldaten entfernt');
+        }, 'Entfernen');
         if (a === 'reset') confirmDialog(`Wirklich ALLE Daten löschen${cfg ? ' – für alle Coaches' : ''}?`, () => { resetAll(); close(); route(); toast('Gelöscht'); });
       });
     },
