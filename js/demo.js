@@ -2,7 +2,7 @@
 // Alle erzeugten Einträge tragen demo: true und lassen sich über
 // „⋯ Daten → Beispieldaten entfernen“ wieder vollständig löschen.
 
-import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, routePoints } from './football.js';
+import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, routePoints, OFFENSE_CONCEPTS, applyConcept } from './football.js';
 import { buildDefense } from './defense.js';
 
 const FIRST = ['Lukas', 'Jonas', 'Ben', 'Elias', 'Noah', 'Paul', 'Leon', 'Finn', 'Luis', 'Felix', 'Henry', 'Emil', 'Anton', 'Theo', 'Mats', 'Jakob',
@@ -58,11 +58,21 @@ const PLAYS = [
   ['Curl/Flat vs Cover 4', 'doubles', 'cover4', { X: 'Curl', H: 'Flat', Y: 'Seam', Z: 'Curl', RB: 'Angle' }],
 ];
 
+// Defense-Beispiele: [Name, Konzept, Gegner-Konzept, zusätzliche Blitzer]
+const DEF_PLAYS = [
+  ['Cover 3 vs Flood', 'cover3', 'flood'],
+  ['Tampa 2 vs Four Verts', 'tampa2', 'fourVerts'],
+  ['Cover 1 Robber vs Mesh', 'cover1', 'mesh'],
+  ['Cover 4 vs Smash', 'cover4', 'smash'],
+  ['Cover 0 Blitz vs Slants', 'cover0', 'slants'],
+  ['Cover 3 Mike-Blitz vs Stick', 'cover3', 'stick', ['M']],
+];
+
 /**
  * Fiktive Daten für ein Team.
  * @param team {id, name}; opts: {level, seed, plays, uid}
  */
-export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 3, uid } = {}) {
+export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 3, defPlays = 3, uid } = {}) {
   const L = LEVELS[level] || LEVELS.u20;
   let s = (seed * 9301 + 49297) % 233280 || 7;
   const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
@@ -136,11 +146,24 @@ export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 
       if (p) { p.route = routePoints(rt, p); p.routeName = rt; }
     }
     return {
-      id: uid('play'), teamId: team.id, demo: true, name, formation, offense, offensePersonnelId: off11.id, concept,
+      id: uid('play'), teamId: team.id, demo: true, side: 'offense', name, formation, offense, offensePersonnelId: off11.id, concept,
       defensePreset: 'auto', defensePersonnelId: defNickel.id, defenseLocked: false,
       defense: buildDefense(offense, concept, 'nickel').players, duration: 4,
       notes: 'Beispiel-Spielzug',
     };
   });
-  return { athletes, personnel, plays: playList };
+  const defNickelOrBase = personnel.find(p => p.preset === 'base43') || defNickel;
+  const defList = DEF_PLAYS.slice(0, defPlays).map(([name, concept, oc, blitz]) => {
+    const c = OFFENSE_CONCEPTS[oc];
+    const offense = applyConcept(formationPlayers(c.formation), oc);
+    const dper = concept === 'cover0' || concept === 'cover1' ? defNickel : defNickelOrBase;
+    const defense = buildDefense(offense, concept, dper.preset).players;
+    for (const id of blitz || []) { const d = defense.find(x => x.id === id); if (d) d.assign = { type: 'rush' }; }
+    return {
+      id: uid('play'), teamId: team.id, demo: true, side: 'defense', name, formation: c.formation, opponentConcept: oc,
+      offense, offensePersonnelId: null, concept, defensePreset: 'auto', defensePersonnelId: dper.id,
+      defenseLocked: !!(blitz && blitz.length), defense, duration: 4, notes: 'Beispiel-Spielzug',
+    };
+  });
+  return { athletes, personnel, plays: [...playList, ...defList] };
 }

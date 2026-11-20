@@ -138,5 +138,6 @@ export function simulate(play, speedOf = () => null) {
   return { frames, separation, duration: T, dt: DT };
 }
 
-export function sepClass(v) { return v >= 3 ? 'sep-good' : v >= 1.5 ? 'sep-mid' : 'sep-bad'; }
-export function sepColor(v) { return v >= 3 ? '#2ecc71' : v >= 1.5 ? '#f1c40f' : '#e74c3c'; }
+// Aus Sicht der Offense ist viel Abstand gut, aus Sicht der Defense schlecht (invert)
+export function sepClass(v, invert = false) { return v >= 3 ? (invert ? 'sep-bad' : 'sep-good') : v >= 1.5 ? 'sep-mid' : (invert ? 'sep-good' : 'sep-bad'); }
+export function sepColor(v, invert = false) { return v >= 3 ? (invert ? '#e74c3c' : '#2ecc71') : v >= 1.5 ? '#f1c40f' : (invert ? '#2ecc71' : '#e74c3c'); }

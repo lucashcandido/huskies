@@ -105,6 +105,30 @@ export const ROUTES = {
   'Sit':      [[0, 6], [0, 6.5]],
 };
 
+// ---------- Typische Offense-Konzepte (Routen-Kombinationen) ----------
+export const OFFENSE_CONCEPTS = {
+  smash:     { label: 'Smash',          formation: 'doubles', routes: { X: 'Hitch', H: 'Corner', Y: 'Corner', Z: 'Hitch', RB: 'Flat' } },
+  fourVerts: { label: 'Four Verticals', formation: 'doubles', routes: { X: 'Go / Fade', H: 'Seam', Y: 'Seam', Z: 'Go / Fade', RB: 'Swing' } },
+  mesh:      { label: 'Mesh',           formation: 'trips',   routes: { X: 'Drag', Y: 'Drag', H: 'Corner', Z: 'Go / Fade', RB: 'Angle' } },
+  flood:     { label: 'Flood',          formation: 'trips',   routes: { X: 'Post', Y: 'Flat', H: 'Out', Z: 'Go / Fade', RB: 'Swing' } },
+  curlFlat:  { label: 'Curl / Flat',    formation: 'doubles', routes: { X: 'Curl', H: 'Flat', Y: 'Seam', Z: 'Curl', RB: 'Angle' } },
+  slants:    { label: 'Slants',         formation: 'spread',  routes: { X: 'Slant', H: 'Slant', Y: 'Slant', Z: 'Slant', RB: 'Swing' } },
+  stick:     { label: 'Stick',          formation: 'trips',   routes: { X: 'Slant', Y: 'Sit', H: 'Flat', Z: 'Go / Fade', RB: 'Angle' } },
+  dagger:    { label: 'Dagger',         formation: 'doubles', routes: { X: 'Go / Fade', H: 'Seam', Y: 'In / Dig', Z: 'In / Dig', RB: 'Swing' } },
+};
+
+/** Setzt die Routen eines Konzepts auf die passenden Spieler (übrige Routen werden gelöscht) */
+export function applyConcept(players, key) {
+  const c = OFFENSE_CONCEPTS[key];
+  for (const p of players) { p.route = []; p.routeName = ''; }
+  if (!c) return players;
+  for (const [role, r] of Object.entries(c.routes)) {
+    const p = players.find(x => x.role === role);
+    if (p) { p.route = routePoints(r, p); p.routeName = r; }
+  }
+  return players;
+}
+
 /** Wandelt eine Routen-Vorlage in absolute Punkte für einen Spieler um */
 export function routePoints(name, p) {
   const def = ROUTES[name];

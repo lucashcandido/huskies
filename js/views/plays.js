@@ -1,7 +1,7 @@
 import { db, upsert, remove, uid, get } from '../store.js';
 import { fullName, athleteSpeedYps } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL } from '../football.js';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept } from '../football.js';
 import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js';
 import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js';
 import { scoped, currentTeamId } from '../team.js';
@@ -13,27 +13,68 @@ const f2 = n => (+n).toFixed(2);
 const snap = v => Math.round(v * 2) / 2;
 
 // ======================= Liste =======================
+const listView = { side: 'offense' };
+export const sideOf = p => p.side === 'defense' ? 'defense' : 'offense';
+
 export function render(root, params) {
   if (params[0]) return renderEditor(root, params[0]);
-  const plays = scoped('plays').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const all = scoped('plays');
+  const plays = all.filter(p => sideOf(p) === listView.side).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const count = s => all.filter(p => sideOf(p) === s).length;
+  const off = listView.side === 'offense';
   root.innerHTML = `
     <div class="page-head">
-      <div><h1>Playbook</h1><p class="muted">Formation wählen, Routen einzeichnen und gegen ein Defense-Konzept laufen lassen.</p></div>
-      <div class="spacer"></div><button class="primary" id="add">+ Spielzug</button>
+      <div><h1>Playbook</h1><p class="muted">${off
+        ? 'Offense: Formation wählen, Routen einzeichnen und gegen ein Defense-Konzept laufen lassen.'
+        : 'Defense: Coverage und Blitzes festlegen und gegen typische Offense-Konzepte testen.'}</p></div>
+      <div class="spacer"></div><button class="primary" id="add">+ ${off ? 'Offense' : 'Defense'}-Spielzug</button>
     </div>
+    <div class="toolbar"><div class="seg" id="sideTabs">
+      <button data-s="offense" class="${off ? 'on' : ''}">Offense (${count('offense')})</button>
+      <button data-s="defense" class="${off ? '' : 'on'}">Defense (${count('defense')})</button>
+    </div></div>
     ${plays.length ? `<div class="cards">${plays.map(p => `<div class="card click" data-id="${p.id}" style="padding:0;overflow:hidden">
       <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${fieldSVG()}${routesSVG(p.offense)}${playersSVG(p, {})}</svg>
       <div style="padding:10px 12px"><h3>${esc(p.name)}</h3>
-      <div class="small muted">${esc(FORMATIONS[p.formation]?.label || '')} · gegen ${esc(CONCEPTS[p.concept]?.label || '')}</div></div>
-    </div>`).join('')}</div>` : '<div class="empty">Noch keine Spielzüge. Leg den ersten an!</div>'}`;
+      <div class="small muted">${off
+        ? `${esc(FORMATIONS[p.formation]?.label || '')} · gegen ${esc(CONCEPTS[p.concept]?.label || '')}`
+        : `${esc(CONCEPTS[p.concept]?.label || '')} · gegen ${esc(OFFENSE_CONCEPTS[p.opponentConcept]?.label || 'Offense')} (${esc(FORMATIONS[p.formation]?.label || '')})`}</div></div>
+    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? 'Offense' : 'Defense'}-Spielzüge. Leg den ersten an!</div>`}`;
   root.querySelectorAll('[data-id]').forEach(c => c.onclick = () => location.hash = `#/plays/${c.dataset.id}`);
-  root.querySelector('#add').onclick = newPlay;
+  root.querySelectorAll('#sideTabs button').forEach(b => b.onclick = () => { listView.side = b.dataset.s; render(root, []); });
+  root.querySelector('#add').onclick = () => (off ? newPlay() : newDefensePlay());
+}
+
+function newDefensePlay() {
+  modal({
+    title: 'Neuer Defense-Spielzug', width: 520,
+    body: `<div class="grid">
+      <div class="field full"><label>Name</label><input id="n" placeholder="z. B. Cover 3 Sky vs Trips"></div>
+      <div class="field full"><label>Defense-Konzept</label><select id="c">${options(Object.entries(CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), 'cover3')}</select></div>
+      <div class="field full"><label>Defense-Personnel</label><select id="dp">${options(scoped('personnel').filter(p => p.side === 'defense').map(p => ({ value: p.id, label: p.name })), '', { empty: 'Automatisch (nach Formation)' })}</select></div>
+      <div class="field full"><label>Gegner-Konzept (Offense)</label><select id="oc">${options(Object.entries(OFFENSE_CONCEPTS).map(([k, v]) => ({ value: k, label: `${v.label} (${FORMATIONS[v.formation].label})` })), 'flood')}</select></div>
+    </div>`,
+    buttons: [{ label: 'Abbrechen', cls: 'ghost' }, { label: 'Anlegen', cls: 'primary', onClick: (close, root) => {
+      const oc = root.querySelector('#oc').value, formation = OFFENSE_CONCEPTS[oc].formation;
+      const concept = root.querySelector('#c').value;
+      const play = {
+        id: uid('play'), teamId: currentTeamId(), side: 'defense',
+        name: root.querySelector('#n').value.trim() || `${CONCEPTS[concept].label} vs ${OFFENSE_CONCEPTS[oc].label}`,
+        formation, opponentConcept: oc, offense: applyConcept(formationPlayers(formation), oc), offensePersonnelId: null,
+        concept, defensePreset: 'auto', defensePersonnelId: root.querySelector('#dp').value || null, defenseLocked: false,
+        defense: [], duration: 4, notes: '',
+      };
+      rebuildDefense(play);
+      upsert('plays', play);
+      location.hash = `#/plays/${play.id}`;
+    } }],
+  });
 }
 
 function newPlay() {
   const s = db();
   modal({
-    title: 'Neuer Spielzug', width: 520,
+    title: 'Neuer Offense-Spielzug', width: 520,
     body: `<div class="grid">
       <div class="field full"><label>Name</label><input id="n" placeholder="z. B. Mesh vs Cover 3"></div>
       <div class="field full"><label>Formation</label><select id="f">${options(Object.entries(FORMATIONS).map(([k, v]) => ({ value: k, label: v.label })), 'doubles')}</select></div>
@@ -43,7 +84,7 @@ function newPlay() {
     buttons: [{ label: 'Abbrechen', cls: 'ghost' }, { label: 'Anlegen', cls: 'primary', onClick: (close, root) => {
       const formation = root.querySelector('#f').value;
       const play = {
-        id: uid('play'), teamId: currentTeamId(), name: root.querySelector('#n').value.trim() || 'Neuer Spielzug',
+        id: uid('play'), teamId: currentTeamId(), side: 'offense', name: root.querySelector('#n').value.trim() || 'Neuer Spielzug',
         formation, offense: formationPlayers(formation), offensePersonnelId: root.querySelector('#op').value || null,
         concept: root.querySelector('#c').value, defensePreset: 'auto', defensePersonnelId: null, defenseLocked: false,
         defense: [], duration: 4, notes: '',
@@ -94,7 +135,7 @@ function routesSVG(offense, { selId, faint } = {}) {
   }).join('');
 }
 
-function playersSVG(play, { pos, sel, names, sepNow } = {}) {
+function playersSVG(play, { pos, sel, names, sepNow, invert } = {}) {
   let s = '';
   const at = (side, p) => (pos && pos[side][p.id]) || p;
   for (const d of play.defense || []) {
@@ -108,7 +149,7 @@ function playersSVG(play, { pos, sel, names, sepNow } = {}) {
   }
   for (const p of play.offense) {
     const q = at('o', p), isSel = sel && sel.side === 'o' && sel.id === p.id;
-    const ring = sepNow && sepNow[p.id] !== undefined ? `<circle r="1.6" fill="none" stroke="${sepColor(sepNow[p.id])}" stroke-width=".3"/>` : '';
+    const ring = sepNow && sepNow[p.id] !== undefined ? `<circle r="1.6" fill="none" stroke="${sepColor(sepNow[p.id], invert)}" stroke-width=".3"/>` : '';
     const elig = isEligible(p);
     s += `<g data-pid="o:${p.id}" transform="translate(${f2(q.x)},${f2(-q.y)})" style="cursor:pointer">
       ${ring}${isSel ? '<circle r="1.55" fill="none" stroke="#5aa0e6" stroke-width=".25"/>' : ''}
@@ -149,11 +190,33 @@ function assignmentsSVG(play, { sel, showZones }) {
 function renderEditor(root, id) {
   const play = get('plays', id);
   if (!play) { root.innerHTML = `<div class="empty">Spielzug nicht gefunden. <a href="#/plays">Zum Playbook</a></div>`; return; }
+  const isDef = sideOf(play) === 'defense';
   const ed = { sel: null, mode: 'move', showZones: false, sim: null, t: 0, playing: false, speed: 1, raf: 0, drag: null, last: 0 };
 
+  const OFFCARD = `
+        <div class="card">
+          <h3>${isDef ? 'Gegner (Offense)' : 'Offense'}</h3>
+          <div class="field"><label>Formation</label><select id="formSel">${options(Object.entries(FORMATIONS).map(([k, v]) => ({ value: k, label: v.label })), play.formation)}</select></div>
+          ${isDef
+            ? `<div class="field" style="margin-top:8px"><label>Konzept</label><select id="ocSel">${options(Object.entries(OFFENSE_CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), play.opponentConcept, { empty: '– eigene Routen –' })}</select></div>
+               <div class="small muted" style="margin-top:6px">Routen lassen sich zusätzlich von Hand ändern.</div>`
+            : `<div class="field" style="margin-top:8px"><label>Personnel</label><select id="opSel"></select></div>
+               <div class="small muted" id="opHint" style="margin-top:6px"></div>`}
+        </div>`;
+  const SELCARD = `<div class="card" id="selCard"></div>`;
+  const DEFCARD = `
+        <div class="card">
+          <h3>Defense</h3>
+          <div class="field"><label>Konzept</label><select id="conceptSel">${options(Object.entries(CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), play.concept)}</select></div>
+          <div class="small muted" id="conceptDesc" style="margin:6px 0 8px"></div>
+          <div class="field"><label>Personnel</label><select id="dpSel"></select></div>
+          <div class="row" style="margin-top:8px"><button id="realign" class="sm">Defense neu ausrichten</button><span class="small muted" id="lockHint"></span></div>
+          ${isDef ? '<div class="small muted" style="margin-top:8px">Verteidiger antippen, um Aufgaben zu ändern – z. B. Blitz („Pass Rush / Blitz“), Mann-Deckung oder eine andere Zone.</div>' : ''}
+        </div>`;
   root.innerHTML = `
     <div class="page-head">
       <div><a href="#/plays" class="small">← Playbook</a>
+      <span class="badge ${isDef ? 'def' : 'off'}">${isDef ? 'Defense' : 'Offense'}</span>
       <h1><input id="name" value="${esc(play.name)}" style="font-size:20px;font-weight:800;background:transparent;border-color:transparent;padding:2px 4px;margin-left:-4px;width:min(520px,80vw)"></h1></div>
       <div class="spacer"></div>
       <button id="dup">Duplizieren</button>
@@ -180,26 +243,12 @@ function renderEditor(root, id) {
         </div>
         <p class="legend" id="hint"></p>
         <div class="card" style="margin-top:10px">
-          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)">Separation (Yards zum nächsten Verteidiger)</h3>
+          <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)">${isDef ? 'Wie offen werden die Receiver? (Yards zum nächsten Verteidiger – weniger ist besser)' : 'Separation (Yards zum nächsten Verteidiger)'}</h3>
           <div id="results"></div>
         </div>
       </div>
       <div class="side">
-        <div class="card">
-          <h3>Offense</h3>
-          <div class="field"><label>Formation</label><select id="formSel">${options(Object.entries(FORMATIONS).map(([k, v]) => ({ value: k, label: v.label })), play.formation)}</select></div>
-          <div class="field" style="margin-top:8px"><label>Personnel</label><select id="opSel"></select></div>
-          <div class="small muted" id="opHint" style="margin-top:6px"></div>
-        </div>
-        <div class="card" id="selCard"></div>
-        <div class="card">
-          <h3>Defense</h3>
-          <div class="field"><label>Konzept</label><select id="conceptSel">${options(Object.entries(CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), play.concept)}</select></div>
-          <div class="small muted" id="conceptDesc" style="margin:6px 0 8px"></div>
-          <div class="field"><label>Personnel</label><select id="dpSel"></select></div>
-          <div class="row" style="margin-top:8px"><button id="realign" class="sm">Defense neu ausrichten</button><span class="small muted" id="lockHint"></span></div>
-        </div>
-        <div class="card">
+${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div class="card">
           <h3>Einstellungen</h3>
           <div class="field"><label>Simulationsdauer</label><select id="durSel">${options([3, 3.5, 4, 5, 6].map(v => ({ value: v, label: v.toString().replace('.', ',') + ' s' })), play.duration)}</select></div>
           <div class="field" style="margin-top:8px"><label>Notizen / Coaching Points</label><textarea id="notes" rows="4">${esc(play.notes || '')}</textarea></div>
@@ -250,7 +299,7 @@ function renderEditor(root, id) {
         content += `<polyline points="${pts}" fill="none" stroke="#ff6b5b" stroke-width=".12" opacity=".5"/>`;
       }
       const sepNow = Object.fromEntries(Object.entries(ed.sim.separation).map(([k, v]) => [k, v[i]]));
-      content += playersSVG(play, { pos: fr, sel: ed.sel, names: M.names, sepNow });
+      content += playersSVG(play, { pos: fr, sel: ed.sel, names: M.names, sepNow, invert: isDef });
     } else {
       content += assignmentsSVG(play, { sel: ed.sel, showZones: ed.showZones });
       content += routesSVG(play.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
@@ -327,10 +376,10 @@ function renderEditor(root, id) {
   function drawPanels() {
     const s = db();
     const offP = scoped('personnel').filter(p => p.side === 'offense');
-    $('#opSel').innerHTML = options(offP.map(p => ({ value: p.id, label: p.name })), play.offensePersonnelId, { empty: '– ohne –' });
+    if ($('#opSel')) $('#opSel').innerHTML = options(offP.map(p => ({ value: p.id, label: p.name })), play.offensePersonnelId, { empty: '– ohne –' });
     const op = play.offensePersonnelId ? get('personnel', play.offensePersonnelId) : null;
     const fPers = FORMATIONS[play.formation]?.personnel;
-    $('#opHint').innerHTML = !offP.length ? 'Lege unter <a href="#/personnel">Personnel</a> eine Offense-Gruppe an, um echte Spieler und ihre gemessene Geschwindigkeit zu verwenden.'
+    if ($('#opHint')) $('#opHint').innerHTML = !offP.length ? 'Lege unter <a href="#/personnel">Personnel</a> eine Offense-Gruppe an, um echte Spieler und ihre gemessene Geschwindigkeit zu verwenden.'
       : op && op.preset !== fPers ? `Hinweis: Formation ist für ${fPers} Personnel gedacht, gewählt ist ${op.preset}. Positionen werden bestmöglich zugeordnet.` : '';
     const defP = scoped('personnel').filter(p => p.side === 'defense');
     $('#dpSel').innerHTML = options([
@@ -356,10 +405,12 @@ function renderEditor(root, id) {
         for (let k = idx(1); k < sep.length; k++) if (sep[k] > bv) { bv = sep[k]; bi = k; }
         return `<tr><td><span style="color:${colorOf(p)};font-weight:800">${esc(p.role)}</span> <span class="small muted">${esc(M.names.o[p.role] || '')}</span></td>
           <td class="small">${esc(p.routeName || 'Freie Route')}</td>
-          ${times.map(t => `<td class="num ${sepClass(sep[idx(t)])}" data-t="${t}" style="cursor:pointer">${sep[idx(t)].toFixed(1).replace('.', ',')}</td>`).join('')}
-          <td class="num ${sepClass(bv)}" data-t="${(bi * DT).toFixed(2)}" style="cursor:pointer">${bv.toFixed(1).replace('.', ',')} <span class="small">@ ${(bi * DT).toFixed(1).replace('.', ',')} s</span></td></tr>`;
+          ${times.map(t => `<td class="num ${sepClass(sep[idx(t)], isDef)}" data-t="${t}" style="cursor:pointer">${sep[idx(t)].toFixed(1).replace('.', ',')}</td>`).join('')}
+          <td class="num ${sepClass(bv, isDef)}" data-t="${(bi * DT).toFixed(2)}" style="cursor:pointer">${bv.toFixed(1).replace('.', ',')} <span class="small">@ ${(bi * DT).toFixed(1).replace('.', ',')} s</span></td></tr>`;
       }).join('')}</tbody></table></div>
-      <p class="legend" style="margin:6px 0 0"><span class="sep-good" style="padding:0 4px">≥ 3 yd offen</span> <span class="sep-mid" style="padding:0 4px">1,5–3 yd eng</span> <span class="sep-bad" style="padding:0 4px">&lt; 1,5 yd gedeckt</span>
+      <p class="legend" style="margin:6px 0 0">${isDef
+        ? '<span class="sep-good" style="padding:0 4px">&lt; 1,5 yd gedeckt</span> <span class="sep-mid" style="padding:0 4px">1,5–3 yd eng</span> <span class="sep-bad" style="padding:0 4px">≥ 3 yd offen</span>'
+        : '<span class="sep-good" style="padding:0 4px">≥ 3 yd offen</span> <span class="sep-mid" style="padding:0 4px">1,5–3 yd eng</span> <span class="sep-bad" style="padding:0 4px">&lt; 1,5 yd gedeckt</span>'}
       · Zeitpunkt anklicken, um ihn auf dem Feld zu sehen. Vereinfachtes Modell – Speeds aus den Messwerten (Max V bzw. 40 yd), sonst Standardwerte.</p>`;
     el.querySelectorAll('[data-t]').forEach(td => td.onclick = () => { stop(); ed.t = +td.dataset.t; draw(); });
   }
@@ -490,13 +541,28 @@ function renderEditor(root, id) {
   $('#notes').onchange = e => { play.notes = e.target.value; save(); };
   $('#durSel').onchange = e => { play.duration = +e.target.value; $('#tSlider').max = play.duration; ed.t = 0; commit(); };
   $('#formSel').onchange = e => {
-    const apply = () => { play.formation = e.target.value; play.offense = formationPlayers(play.formation); ed.sel = null; play.defenseLocked = false; commit({ realign: true }); };
-    if (play.offense.some(p => p.route?.length)) {
+    const apply = () => {
+      play.formation = e.target.value; play.offense = formationPlayers(play.formation);
+      if (isDef && play.opponentConcept) applyConcept(play.offense, play.opponentConcept);
+      ed.sel = null; play.defenseLocked = false; commit({ realign: true });
+    };
+    if (!isDef && play.offense.some(p => p.route?.length)) {
       confirmDialog('Neue Formation setzt alle Spieler zurück und löscht die Routen. Fortfahren?', apply, 'Formation wechseln');
       e.target.value = play.formation;
     } else apply();
   };
-  $('#opSel').onchange = e => { play.offensePersonnelId = e.target.value || null; commit(); };
+  if ($('#opSel')) $('#opSel').onchange = e => { play.offensePersonnelId = e.target.value || null; commit(); };
+  if ($('#ocSel')) $('#ocSel').onchange = e => {
+    play.opponentConcept = e.target.value || null;
+    const c = OFFENSE_CONCEPTS[play.opponentConcept];
+    if (c) {
+      // Formation des Konzepts übernehmen, Routen setzen
+      if (c.formation !== play.formation) { play.formation = c.formation; play.offense = formationPlayers(c.formation); $('#formSel').value = c.formation; }
+      applyConcept(play.offense, play.opponentConcept);
+      if (ed.sel?.side === 'o') ed.sel = null;
+      commit({ realign: true });
+    } else save();
+  };
   $('#conceptSel').onchange = e => {
     const go = () => { play.concept = e.target.value; play.defenseLocked = false; ed.sel = ed.sel?.side === 'd' ? null : ed.sel; commit({ realign: true }); };
     if (play.defenseLocked) { confirmDialog('Manuelle Anpassungen der Defense gehen verloren. Fortfahren?', go, 'Konzept wechseln'); e.target.value = play.concept; }
