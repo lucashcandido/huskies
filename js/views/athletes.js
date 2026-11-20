@@ -4,7 +4,7 @@ import { METRICS, METRIC, POSITIONS, fullName, ageOf, metricValue, latestValue, 
 import { esc, modal, toast, confirmDialog, options, sparkline } from '../ui.js';
 import { scoped, currentTeamId, teams } from '../team.js';
 
-const view = { q: '', pos: '', roster: '', mode: 'latest', sort: 'name', dir: 1 };
+const view = { q: '', pos: '', mode: 'latest', sort: 'name', dir: 1 };
 
 export function render(root) {
   const s = db();
@@ -20,7 +20,6 @@ export function render(root) {
     <div class="toolbar">
       <input class="grow" id="q" placeholder="Suche nach Name …" value="${esc(view.q)}">
       <select id="pos">${options(POSITIONS, view.pos, { empty: 'Alle Positionen' })}</select>
-      <select id="roster">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), view.roster, { empty: 'Alle Roster' })}</select>
       <div class="seg" id="mode">
         <button data-m="latest" class="${view.mode === 'latest' ? 'on' : ''}">Aktuell</button>
         <button data-m="best" class="${view.mode === 'best' ? 'on' : ''}">Bestwert</button>
@@ -32,7 +31,6 @@ export function render(root) {
   const draw = () => drawTable(root);
   root.querySelector('#q').oninput = e => { view.q = e.target.value; draw(); };
   root.querySelector('#pos').onchange = e => { view.pos = e.target.value; draw(); };
-  root.querySelector('#roster').onchange = e => { view.roster = e.target.value; draw(); };
   root.querySelectorAll('#mode button').forEach(b => b.onclick = () => {
     view.mode = b.dataset.m;
     root.querySelectorAll('#mode button').forEach(x => x.classList.toggle('on', x === b));
@@ -48,11 +46,6 @@ function filtered() {
   let list = scoped('athletes');
   if (q) list = list.filter(a => fullName(a).toLowerCase().includes(q));
   if (view.pos) list = list.filter(a => a.position === view.pos);
-  if (view.roster) {
-    const r = s.rosters.find(r => r.id === view.roster);
-    const ids = new Set((r?.members || []).map(m => m.athleteId));
-    list = list.filter(a => ids.has(a.id));
-  }
   return list;
 }
 
@@ -127,6 +120,7 @@ export function openAthlete(existing, onDone) {
       <div class="field"><label>Nachname</label><input id="ln" value="${esc(a.lastName)}"></div>
       <div class="field"><label>Geburtsdatum</label><input id="bd" type="date" value="${esc(a.birthDate || '')}"></div>
       <div class="field"><label>Alter <span style="text-transform:none">(falls kein Geb.-Datum)</span></label><input id="age" type="number" min="5" max="60" value="${a.age ?? ''}"></div>
+      <div class="field"><label>Trikotnummer</label><input id="num" inputmode="numeric" value="${esc(a.number ?? '')}"></div>
       <div class="field"><label>Position</label><select id="posSel">${options(POSITIONS, a.position, { empty: '–' })}</select></div>
       ${teams().length > 1 ? `<div class="field"><label>Team</label><select id="teamSel">${options(teams().map(t => ({ value: t.id, label: t.name })), a.teamId)}</select></div>` : ''}
       <div class="field full"><label>Notizen</label><textarea id="notes" rows="2">${esc(a.notes || '')}</textarea></div>
@@ -206,7 +200,9 @@ export function openAthlete(existing, onDone) {
     a.lastName = root.querySelector('#ln').value.trim();
     a.birthDate = root.querySelector('#bd').value;
     a.age = a.birthDate ? null : parseNum(ageInput.value);
+    if (a.position !== root.querySelector('#posSel').value) a.depth = null;
     a.position = root.querySelector('#posSel').value;
+    a.number = root.querySelector('#num').value.trim();
     a.notes = root.querySelector('#notes').value;
     if (root.querySelector('#teamSel')) a.teamId = root.querySelector('#teamSel').value;
     if (!a.firstName && !a.lastName) { alert('Bitte mindestens einen Namen eintragen.'); return false; }

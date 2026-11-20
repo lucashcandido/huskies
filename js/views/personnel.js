@@ -3,6 +3,7 @@ import { fullName, metricValue, fmtMetric } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
 import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js';
 import { scoped, currentTeamId } from '../team.js';
+import { depthOrder } from './rosters.js';
 
 export function render(root, params) {
   if (params[0]) return renderDetail(root, params[0]);
@@ -11,12 +12,11 @@ export function render(root, params) {
   const group = side => all.filter(p => p.side === side);
   const card = p => {
     const filled = p.slots.filter(x => x.athleteId).length;
-    const roster = p.rosterId ? get('rosters', p.rosterId) : null;
     return `<div class="card click" data-id="${p.id}">
       <div class="row"><span class="badge ${p.side === 'offense' ? 'off' : 'def'}">${p.side === 'offense' ? 'Offense' : 'Defense'}</span>
       <span class="small muted">${esc(presetLabel(p))}</span></div>
       <h3 style="margin-top:8px">${esc(p.name)}</h3>
-      <div class="small muted">${roster ? 'Roster: ' + esc(roster.name) : 'ohne Roster'} · ${filled}/${p.slots.length} besetzt</div>
+      <div class="small muted">${filled}/${p.slots.length} besetzt</div>
     </div>`;
   };
   root.innerHTML = `
@@ -44,8 +44,7 @@ function createPersonnel() {
       <div class="field full"><label>Name</label><input id="n" placeholder="z. B. 11 Personnel – Starter"></div>
       <div class="field"><label>Seite</label><select id="side"><option value="offense">Offense</option><option value="defense">Defense</option></select></div>
       <div class="field"><label>Gruppierung</label><select id="preset"></select></div>
-      <div class="field full"><label>Roster (Spielerauswahl)</label><select id="ros">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), scoped('rosters')[0]?.id, { empty: 'Alle Athlet:innen' })}</select></div>
-      <label class="full" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt)"><input type="checkbox" id="auto" checked style="width:auto"> Automatisch nach Depth Chart besetzen</label>
+      <label class="full" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt)"><input type="checkbox" id="auto" checked style="width:auto"> Automatisch nach Depth Chart besetzen (Roster)</label>
     </div>`,
     onOpen(root) {
       const sideSel = root.querySelector('#side'), pre = root.querySelector('#preset');
@@ -61,7 +60,6 @@ function createPersonnel() {
       const p = {
         id: uid('per'), teamId: currentTeamId(), side, preset,
         name: root.querySelector('#n').value.trim() || src[preset].label.split(' (')[0],
-        rosterId: root.querySelector('#ros').value || null,
         slots: src[preset].slots.map(sl => ({ ...sl, athleteId: null })),
         notes: '',
       };
@@ -72,19 +70,10 @@ function createPersonnel() {
   });
 }
 
-/** Kandidaten für einen Slot: zuerst passende Position (nach Depth), dann der Rest */
+/** Kandidaten für einen Slot: alle Spieler des Teams, passende Position zuerst (nach Depth Chart) */
 function candidates(p, pos) {
-  const s = db();
-  if (p.rosterId) {
-    const r = get('rosters', p.rosterId);
-    if (r) {
-      return r.members.map(m => ({ a: get('athletes', m.athleteId), pos: m.position, depth: m.depth || 99, number: m.number }))
-        .filter(x => x.a)
-        .sort((x, y) => ((x.pos === pos ? 0 : 1) - (y.pos === pos ? 0 : 1)) || (x.depth - y.depth));
-    }
-  }
-  return scoped('athletes').map(a => ({ a, pos: a.position, depth: 99 }))
-    .sort((x, y) => ((x.pos === pos ? 0 : 1) - (y.pos === pos ? 0 : 1)) || (x.a.lastName || '').localeCompare(y.a.lastName || ''));
+  return depthOrder(scoped('athletes')).map(a => ({ a, pos: a.position, depth: a.depth || 99, number: a.number }))
+    .sort((x, y) => (x.pos === pos ? 0 : 1) - (y.pos === pos ? 0 : 1));
 }
 
 function autoFill(p) {
@@ -106,7 +95,6 @@ function renderDetail(root, id) {
       <h1><input id="name" value="${esc(p.name)}" style="font-size:20px;font-weight:800;background:transparent;border-color:transparent;padding:2px 4px;margin-left:-4px"></h1>
       <p class="muted"><span class="badge ${p.side === 'offense' ? 'off' : 'def'}">${p.side === 'offense' ? 'Offense' : 'Defense'}</span> ${esc(presetLabel(p))}</p></div>
       <div class="spacer"></div>
-      <div class="field"><label>Roster</label><select id="ros">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), p.rosterId, { empty: 'Alle Athlet:innen' })}</select></div>
       <button id="auto">Nach Depth Chart füllen</button>
       <button id="dup">Duplizieren</button>
       <button class="danger" id="del">Löschen</button>
@@ -119,7 +107,6 @@ function renderDetail(root, id) {
   const save = () => upsert('personnel', p);
   root.querySelector('#name').onchange = e => { p.name = e.target.value.trim() || p.name; save(); toast('Gespeichert'); };
   root.querySelector('#notes').onchange = e => { p.notes = e.target.value; save(); };
-  root.querySelector('#ros').onchange = e => { p.rosterId = e.target.value || null; save(); draw(); };
   root.querySelector('#auto').onclick = () => { autoFill(p); save(); draw(); toast('Freie Slots besetzt'); };
   root.querySelector('#dup').onclick = () => { const c = structuredClone(p); c.id = uid('per'); c.name += ' (Kopie)'; upsert('personnel', c); location.hash = `#/personnel/${c.id}`; };
   root.querySelector('#del').onclick = () => confirmDialog(`„${p.name}“ löschen?`, () => { remove('personnel', p.id); location.hash = '#/personnel'; });

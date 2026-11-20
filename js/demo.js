@@ -56,25 +56,22 @@ export function demoData() {
       n++;
     }
   }
-  const roster = {
-    id: uid('ros'), name: 'U19 Saison 2027', team: 'U19', season: '2027', notes: '',
-    members: [],
-  };
   const depth = {};
   athletes.forEach((a, i) => {
     depth[a.position] = (depth[a.position] || 0) + 1;
-    roster.members.push({ athleteId: a.id, number: String(((i * 37) % 89) + 1), position: a.position, depth: depth[a.position] });
+    a.number = String(((i * 37) % 89) + 1);
+    a.depth = depth[a.position];
   });
   const fillSlots = (slots) => {
     const used = new Set();
     return slots.map(sl => {
-      const m = roster.members.filter(x => x.position === sl.pos && !used.has(x.athleteId)).sort((a, b) => a.depth - b.depth)[0];
-      if (m) used.add(m.athleteId);
-      return { ...sl, athleteId: m ? m.athleteId : null };
+      const m = athletes.filter(x => x.position === sl.pos && !used.has(x.id)).sort((a, b) => a.depth - b.depth)[0];
+      if (m) used.add(m.id);
+      return { ...sl, athleteId: m ? m.id : null };
     });
   };
-  const off11 = { id: uid('per'), side: 'offense', preset: '11', name: '11 Personnel – Starter', rosterId: roster.id, slots: fillSlots(OFFENSE_PERSONNEL['11'].slots), notes: '' };
-  const defNickel = { id: uid('per'), side: 'defense', preset: 'nickel', name: 'Nickel – Starter', rosterId: roster.id, slots: fillSlots(DEFENSE_PERSONNEL.nickel.slots), notes: '' };
+  const off11 = { id: uid('per'), side: 'offense', preset: '11', name: '11 Personnel – Starter', slots: fillSlots(OFFENSE_PERSONNEL['11'].slots), notes: '' };
+  const defNickel = { id: uid('per'), side: 'defense', preset: 'nickel', name: 'Nickel – Starter', slots: fillSlots(DEFENSE_PERSONNEL.nickel.slots), notes: '' };
 
   const mkPlay = (name, formation, concept, routes) => {
     const offense = formationPlayers(formation);
@@ -94,6 +91,6 @@ export function demoData() {
     mkPlay('Mesh vs Cover 1', 'trips', 'cover1', { X: 'Drag', Y: 'Drag', H: 'Corner', Z: 'Go / Fade', RB: 'Angle' }),
   ];
   const team = { id: uid('team'), name: 'U19', order: 0 };
-  for (const x of [...athletes, roster, off11, defNickel, ...plays]) x.teamId = team.id;
-  return { version: 1, teams: [team], athletes, rosters: [roster], personnel: [off11, defNickel], plays };
+  for (const x of [...athletes, off11, defNickel, ...plays]) x.teamId = team.id;
+  return { version: 1, teams: [team], athletes, rosters: [], personnel: [off11, defNickel], plays };
 }

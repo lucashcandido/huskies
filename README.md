@@ -7,8 +7,8 @@ Webapp für Combine-Messungen, Kaderplanung und Spielzüge. Läuft komplett im B
 - **Team-Auswahl**: Beim Start wählt man einmal das Team (z. B. U15, U19, Herren). Die Wahl bleibt auf dem Gerät gespeichert und gilt für alle Bereiche; gewechselt wird über den blauen Team-Button oben. Athlet:innen lassen sich im Bearbeiten-Dialog einem anderen Team zuordnen.
 - **Athleten**: Stammdaten (Name, Geburtsdatum bzw. Alter, Position) und Messverlauf für Gewicht, 40 Yard Dash, Shuffle, L-Cone rechts/links, Broad Jump, Vertical Jump und Max. Geschwindigkeit. Sortierbare Tabelle mit Aktuell-/Bestwert-Ansicht, Einfärbung nach Vierteln, Verlauf je Messwert, Plausibilitätswarnungen.
 - **Testtag**: Schnellerfassung am Platz – *Station* (ein Test, alle Spieler, Enter = nächster) oder *Tabelle* (alle Tests). Jeder Wert wird sofort gespeichert.
-- **Roster**: Kader aus Athlet:innen zusammenstellen, mit Trikotnummer, Position, Depth Chart und Durchschnittswerten je Position. Druckbar.
-- **Personnel**: Offense- (10/11/12/21/22) und Defense-Gruppen (4-3, Nickel, Dime) mit konkreten Spielern, automatisch nach Depth Chart befüllbar.
+- **Roster**: wird automatisch aus allen Athlet:innen des gewählten Teams gebildet. Trikotnummer, Position und Depth werden direkt am Spieler gepflegt; ohne Depth-Angabe wird nach 40-yd-Zeit sortiert (auf Knopfdruck auch für alle Positionen). Depth Chart, Durchschnittswerte je Position, druckbar.
+- **Personnel**: Offense- (10/11/12/21/22) und Defense-Gruppen (4-3, Nickel, Dime) mit konkreten Spielern, automatisch nach dem Depth Chart des Rosters befüllbar.
 - **Playbook**: Formationen, Routen aus dem Routenbaum oder frei gezeichnet, Defense-Konzepte (Cover 0, 1, 2, Tampa 2, 3, 4) richten sich automatisch aus. Die **Simulation** lässt die Routen gegen die Defense laufen und zeigt die Separation je Receiver über die Zeit. Ist ein Personnel hinterlegt, werden die gemessenen Speeds (Max V bzw. 40 yd) verwendet.
 
 ## Daten & Synchronisierung (Huskies Data)
