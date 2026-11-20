@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Huskies · Athletik &amp; Playbook</title>
+<meta name="theme-color" content="#0b0c0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c7ccd4'/%3E%3Ctext x='16' y='23' font-family='Arial' font-weight='900' font-size='20' text-anchor='middle' fill='%230b0c0e'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#/athletes">
+    <span class="logo">H</span>
+    <span class="brand-text">HUSKIES<small>Athletik · Roster · Playbook</small></span>
+  </a>
+  <nav class="nav" id="nav">
+    <a href="#/athletes" data-route="athletes">Athleten</a>
+    <a href="#/testday" data-route="testday">Testtag</a>
+    <a href="#/rosters" data-route="rosters">Roster</a>
+    <a href="#/personnel" data-route="personnel">Personnel</a>
+    <a href="#/plays" data-route="plays">Playbook</a>
+  </nav>
+  <div class="spacer"></div>
+  <button class="ghost icon-btn" id="dataMenuBtn" title="Daten sichern / laden">⋯ Daten</button>
+</header>
+<main id="app" class="wrap"></main>
+<div id="toast" class="toast"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
