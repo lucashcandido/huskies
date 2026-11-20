@@ -4,6 +4,7 @@ import { esc, modal, toast, confirmDialog, options } from '../ui.js';
 import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js';
 import { scoped, currentTeamId } from '../team.js';
 import { depthOrder } from './rosters.js';
+import { lineup } from '../lineup.js';
 
 export function render(root, params) {
   if (params[0]) return renderDetail(root, params[0]);
@@ -44,7 +45,7 @@ function createPersonnel() {
       <div class="field full"><label>Name</label><input id="n" placeholder="z. B. 11 Personnel – Starter"></div>
       <div class="field"><label>Seite</label><select id="side"><option value="offense">Offense</option><option value="defense">Defense</option></select></div>
       <div class="field"><label>Gruppierung</label><select id="preset"></select></div>
-      <label class="full" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt)"><input type="checkbox" id="auto" checked style="width:auto"> Automatisch nach Depth Chart besetzen (Roster)</label>
+      <label class="full" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt)"><input type="checkbox" id="auto" checked style="width:auto"> Automatisch nach Roster-Aufstellung besetzen</label>
     </div>`,
     onOpen(root) {
       const sideSel = root.querySelector('#side'), pre = root.querySelector('#preset');
@@ -78,8 +79,13 @@ function candidates(p, pos) {
 
 function autoFill(p) {
   const used = new Set(p.slots.filter(s => s.athleteId).map(s => s.athleteId));
+  const lu = lineup(scoped('athletes'));
+  const side = p.side === 'offense' ? 'O:' : 'D:';
   for (const slot of p.slots) {
     if (slot.athleteId) continue;
+    // zuerst der Starter auf dem gleichnamigen Platz der Roster-Aufstellung, sonst nach Position
+    const fromLineup = (lu[side + slot.role] || []).find(a => !used.has(a.id));
+    if (fromLineup) { slot.athleteId = fromLineup.id; used.add(fromLineup.id); continue; }
     const c = candidates(p, slot.pos).find(x => x.pos === slot.pos && !used.has(x.a.id));
     if (c) { slot.athleteId = c.a.id; used.add(c.a.id); }
   }
@@ -95,7 +101,7 @@ function renderDetail(root, id) {
       <h1><input id="name" value="${esc(p.name)}" style="font-size:20px;font-weight:800;background:transparent;border-color:transparent;padding:2px 4px;margin-left:-4px"></h1>
       <p class="muted"><span class="badge ${p.side === 'offense' ? 'off' : 'def'}">${p.side === 'offense' ? 'Offense' : 'Defense'}</span> ${esc(presetLabel(p))}</p></div>
       <div class="spacer"></div>
-      <button id="auto">Nach Depth Chart füllen</button>
+      <button id="auto">Nach Roster-Aufstellung füllen</button>
       <button id="dup">Duplizieren</button>
       <button class="danger" id="del">Löschen</button>
     </div>

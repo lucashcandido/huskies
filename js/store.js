@@ -3,7 +3,7 @@
 // Lokal liegt alles im localStorage. Damit mehrere Coaches gleichzeitig arbeiten
 // können, bekommt jedes Feld eines Datensatzes einen Zeitstempel (_ts). Beim
 // Abgleich mit dem gemeinsamen Daten-Repo gewinnt pro Feld die neuere Änderung –
-// zwei Coaches, die am Testtag verschiedene Stationen erfassen, überschreiben
+// zwei Coaches, die beim Combine verschiedene Stationen erfassen, überschreiben
 // sich also nicht. Messungen werden einzeln (pro Messtag) zusammengeführt,
 // Löschungen als Grabstein (_deleted) mitgeführt.
 //

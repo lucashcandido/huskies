@@ -7,12 +7,12 @@ import * as sync from './sync.js';
 import { teams, currentTeam, setTeam, clearTeam, createTeam, renameTeam, teamUsage, untaggedCount, adoptUntagged } from './team.js';
 import { persist } from './store.js';
 import * as athletes from './views/athletes.js';
-import * as testday from './views/testday.js';
+import * as combine from './views/combine.js';
 import * as rosters from './views/rosters.js';
 import * as personnel from './views/personnel.js';
 import * as plays from './views/plays.js';
 
-const routes = { athletes, testday, rosters, personnel, plays };
+const routes = { athletes, combine, testday: combine, rosters, personnel, plays };
 const app = document.getElementById('app');
 const LOCAL_KEY = 'huskies.localOnly';
 let cleanup = null;
@@ -39,7 +39,7 @@ function route() {
   const hash = location.hash.replace(/^#\/?/, '') || 'athletes';
   const [name, ...params] = hash.split('/');
   const view = routes[name] || athletes;
-  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === (routes[name] ? name : 'athletes')));
+  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.route === (['combine', 'testday'].includes(name) ? 'athletes' : routes[name] ? name : 'athletes')));
   cleanup = view.render(app, params.map(decodeURIComponent)) || null;
 }
 

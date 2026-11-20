@@ -9,7 +9,7 @@ export function render(root) {
   const s = db();
   root.innerHTML = `
     <div class="page-head">
-      <div><h1>Testtag</h1>
+      <div><a href="#/athletes" class="small">← Athleten</a><h1>Combine erfassen</h1>
       <p class="muted">Schnelle Erfassung am Platz. Jeder Wert wird sofort gespeichert – <span class="kbd">Enter</span> springt zur nächsten Person.</p></div>
     </div>
     <div class="toolbar">

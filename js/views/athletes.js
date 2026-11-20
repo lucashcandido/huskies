@@ -13,7 +13,7 @@ export function render(root) {
       <div><h1>Athleten &amp; Messwerte</h1>
       <p class="muted">Stammdaten und Combine-Werte. Zeile anklicken für Verlauf und Bearbeitung.</p></div>
       <div class="spacer"></div>
-      <a href="#/testday"><button>Testtag erfassen</button></a>
+      <a href="#/combine"><button>Combine erfassen</button></a>
       <button class="primary" id="addAth">+ Athlet:in</button>
     </div>
     <div class="stats" id="stats"></div>
