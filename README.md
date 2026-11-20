@@ -10,9 +10,17 @@ Webapp für Combine-Messungen, Kaderplanung und Spielzüge. Läuft komplett im B
 - **Personnel**: Offense- (10/11/12/21/22) und Defense-Gruppen (4-3, Nickel, Dime) mit konkreten Spielern, automatisch nach Depth Chart befüllbar.
 - **Playbook**: Formationen, Routen aus dem Routenbaum oder frei gezeichnet, Defense-Konzepte (Cover 0, 1, 2, Tampa 2, 3, 4) richten sich automatisch aus. Die **Simulation** lässt die Routen gegen die Defense laufen und zeigt die Separation je Receiver über die Zeit. Ist ein Personnel hinterlegt, werden die gemessenen Speeds (Max V bzw. 40 yd) verwendet.
 
-## Daten
+## Daten & Synchronisierung (Huskies Data)
 
-Alles wird im `localStorage` des Browsers gespeichert. Über **⋯ Daten** gibt es Backup (JSON) herunterladen/laden, CSV-Export für Excel und Beispieldaten. Die Speicherlogik liegt gebündelt in `js/store.js` und lässt sich später gegen ein Backend (z. B. Supabase) tauschen, damit mehrere Coaches dieselben Daten sehen.
+Alle Coaches arbeiten auf denselben Daten im privaten Repo **`huskies-data`** – nach demselben Prinzip wie Cast Comercial:
+
+1. **Admin, einmalig:** einen [Fine-grained Token](https://github.com/settings/personal-access-tokens/new) erstellen, der **nur** `lucashcandido/huskies-data` erreicht (Repository permissions → *Contents: Read and write*). In der App „Admin: einmalig mit GitHub-Token einrichten“ wählen.
+2. Die App erstellt einen **12-stelligen Zugangscode** und verschlüsselt `{repo, token}` damit (PBKDF2 600 000 Runden + AES-GCM) zu `access.json`. Weil der Token absichtlich nicht ins App-Repo schreiben darf, zeigt die App den Inhalt an → als `access.json` ins Root dieses Repos legen (Link in der App).
+3. **Coaches:** App öffnen, Namen und Code eingeben – oder einfach den Link `…/#c=CODE` öffnen.
+
+Abgleich: Änderungen werden nach 1,5 s hochgeladen, alle 45 s und beim Zurückkehren in die App wird geladen. Pro Feld gewinnt die neuere Änderung, Messungen werden pro Messtag zusammengeführt – zwei Coaches an verschiedenen Stationen überschreiben sich nicht. Offline erfasste Werte werden nachgereicht. Jeder Commit trägt den Namen des Coaches; über den Git-Verlauf lässt sich jeder Stand wiederherstellen. Läuft der Token ab, genügt es, mit dem neuen Token einen Code neu zu erzeugen und `access.json` zu ersetzen – Geräte mit dem alten Code verbinden sich nur neu, wenn derselbe Code weiterverwendet wird.
+
+Über **⋯ Daten** gibt es zusätzlich Backup (JSON), CSV-Export für Excel und Beispieldaten. Ohne Verbindung („nur auf diesem Gerät“) bleibt alles im `localStorage`.
 
 ## Lokal starten
 
@@ -33,7 +41,8 @@ Der Workflow `.github/workflows/pages.yml` veröffentlicht die App bei jedem Pus
 index.html
 css/styles.css
 js/app.js          Router, Datenmenü
-js/store.js        Speicher (localStorage, Import/Export)
+js/store.js        Speicher, Zeitstempel je Feld, Zusammenführen
+js/sync.js         Zugangscode, GitHub-Abgleich mit huskies-data
 js/metrics.js      Messwert-Definitionen, Alter, Bestwerte
 js/football.js     Personnel, Formationen, Routenbaum
 js/defense.js      Defense-Konzepte, Ausrichtung, Zonen

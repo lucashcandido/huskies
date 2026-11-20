@@ -58,7 +58,8 @@ function setValue(athleteId, key, value) {
   if (!a) return;
   a.measurements = a.measurements || [];
   let m = measurementOn(a, view.date);
-  if (!m) { m = { id: uid('m'), date: view.date }; a.measurements.push(m); }
+  if (!m) { // feste ID pro Messtag: so landen Werte mehrerer Coaches im selben Datensatz
+    m = { id: a.measurements.some(x => x.id === 'm_' + view.date) ? uid('m') : 'm_' + view.date, date: view.date }; a.measurements.push(m); }
   m[key] = value;
   if (METRICS.every(x => m[x.key] === null || m[x.key] === undefined)) a.measurements = a.measurements.filter(x => x !== m);
   upsert('athletes', a);

@@ -118,7 +118,7 @@ function drawTable(root) {
 export function openAthlete(existing, onDone) {
   const a = existing ? structuredClone(existing) : { id: uid('ath'), firstName: '', lastName: '', birthDate: '', age: null, position: '', notes: '', measurements: [] };
   const isNew = !existing;
-  if (isNew) a.measurements.push({ id: uid('m'), date: today() });
+  if (isNew) a.measurements.push({ id: 'm_' + today(), date: today() });
 
   const body = `
     <div class="grid">
@@ -196,7 +196,7 @@ export function openAthlete(existing, onDone) {
     root.querySelector('#warn').textContent = w.length ? '⚠ ' + w.join(' · ') : '';
   }
 
-  root.querySelector('#addM').onclick = () => { a.measurements.push({ id: uid('m'), date: today() }); drawMeasurements(); };
+  root.querySelector('#addM').onclick = () => { a.measurements.push({ id: a.measurements.some(m => m.id === 'm_' + today()) ? uid('m') : 'm_' + today(), date: today() }); drawMeasurements(); };
   drawMeasurements(); drawSparks(); checkWarn();
 
   function save() {
