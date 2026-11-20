@@ -1,16 +1,32 @@
 import { db, upsert, remove, uid, get } from '../store.js';
 import { fullName, athleteSpeedYps } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept } from '../football.js';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, personnelOf, familyOf, relRoutes, offenseIn } from '../football.js';
 import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js';
 import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js';
 import { scoped, currentTeamId } from '../team.js';
+import { depthOrder } from './rosters.js';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
 const VIEW = { x: -1, y: -32, w: W + 2, h: 44 };
 const f2 = n => (+n).toFixed(2);
 const snap = v => Math.round(v * 2) / 2;
+
+// ======================= Ansicht in anderem Personnel =======================
+function defPreset(play) {
+  const dp = play.defensePersonnelId ? get('personnel', play.defensePersonnelId) : null;
+  return dp ? dp.preset : (play.defensePreset || 'auto');
+}
+/** Spielzug so, wie er in einem Personnel aussieht (Basis-Personnel = gespeicherter Stand) */
+export function viewOf(play, pers, withDefense = true) {
+  let v = play;
+  if (pers && pers !== personnelOf(play.formation)) {
+    const g = offenseIn(pers, familyOf(play.formation), relRoutes(play.offense, personnelOf(play.formation)));
+    v = { ...play, formation: g.formation, offense: g.players, defense: buildDefense(g.players, play.concept, defPreset(play)).players };
+  }
+  return withDefense ? v : { ...v, defense: [] };
+}
 
 // ======================= Liste =======================
 const listView = { side: 'offense' };
@@ -25,7 +41,7 @@ export function render(root, params) {
   root.innerHTML = `
     <div class="page-head">
       <div><h1>Playbook</h1><p class="muted">${off
-        ? 'Offense: Formation wählen, Routen einzeichnen und gegen ein Defense-Konzept laufen lassen.'
+        ? 'Offense-Konzepte – in 11 Personnel dargestellt. Antippen, um das Konzept in anderem Personnel zu sehen und gegen eine Defense laufen zu lassen.'
         : 'Defense: Coverage und Blitzes festlegen und gegen typische Offense-Konzepte testen.'}</p></div>
       <div class="spacer"></div><button class="primary" id="add">+ ${off ? 'Offense' : 'Defense'}-Spielzug</button>
     </div>
@@ -34,10 +50,10 @@ export function render(root, params) {
       <button data-s="defense" class="${off ? '' : 'on'}">Defense (${count('defense')})</button>
     </div></div>
     ${plays.length ? `<div class="cards">${plays.map(p => `<div class="card click" data-id="${p.id}" style="padding:0;overflow:hidden">
-      <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${fieldSVG()}${routesSVG(p.offense)}${playersSVG(p, {})}</svg>
+      <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, '11', false) : p)}</svg>
       <div style="padding:10px 12px"><h3>${esc(p.name)}</h3>
       <div class="small muted">${off
-        ? `${esc(FORMATIONS[p.formation]?.label || '')} · gegen ${esc(CONCEPTS[p.concept]?.label || '')}`
+        ? `${esc(FORMATIONS[viewOf(p, '11').formation]?.label || '')} · 11 Personnel`
         : `${esc(CONCEPTS[p.concept]?.label || '')} · gegen ${esc(OFFENSE_CONCEPTS[p.opponentConcept]?.label || 'Offense')} (${esc(FORMATIONS[p.formation]?.label || '')})`}</div></div>
     </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? 'Offense' : 'Defense'}-Spielzüge. Leg den ersten an!</div>`}`;
   root.querySelectorAll('[data-id]').forEach(c => c.onclick = () => location.hash = `#/plays/${c.dataset.id}`);
@@ -192,6 +208,14 @@ function renderEditor(root, id) {
   if (!play) { root.innerHTML = `<div class="empty">Spielzug nicht gefunden. <a href="#/plays">Zum Playbook</a></div>`; return; }
   const isDef = sideOf(play) === 'defense';
   const ed = { sel: null, mode: 'move', showZones: false, sim: null, t: 0, playing: false, speed: 1, raf: 0, drag: null, last: 0 };
+  // Ansicht: Personnel (Standard 11) und Defense ein/aus (bei Offense-Spielzügen, gemerkt pro Gerät)
+  const basePers = () => personnelOf(play.formation);
+  ed.pers = '11';
+  ed.showDef = isDef || localStorage.getItem('huskies.showDef') === '1';
+  const editable = () => ed.pers === basePers();
+  let V = play;
+  const buildView = () => { V = viewOf(play, editable() ? null : ed.pers, ed.showDef); };
+  buildView();
 
   const OFFCARD = `
         <div class="card">
@@ -224,6 +248,10 @@ function renderEditor(root, id) {
     </div>
     <div class="designer">
       <div>
+        <div class="row" style="margin-bottom:8px;justify-content:space-between">
+          <div class="row" style="gap:6px"><span class="small muted">${isDef ? 'Gegner-Personnel' : 'Personnel'}</span><div class="seg" id="persSeg"></div></div>
+          ${isDef ? '' : '<button id="defToggle"></button>'}
+        </div>
         <div class="field-wrap">
           <svg class="field-svg" id="svg" viewBox="${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}"></svg>
           <div class="sim-bar">
@@ -265,10 +293,17 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     const op = play.offensePersonnelId ? get('personnel', play.offensePersonnelId) : null;
     if (op) {
       const used = new Set();
-      for (const p of play.offense) {
+      for (const p of V.offense) {
         let sl = op.slots.find(s => s.role === p.role && !used.has(s));
-        if (!sl) sl = op.slots.find(s => s.pos === p.pos && !used.has(s) && !play.offense.some(q => q.role === s.role));
+        if (!sl) sl = op.slots.find(s => s.pos === p.pos && !used.has(s) && !V.offense.some(q => q.role === s.role));
         if (sl) { used.add(sl); const a = sl.athleteId && get('athletes', sl.athleteId); if (a) { oa[p.role] = a; o[p.role] = a.lastName || fullName(a); } }
+      }
+      // Rollen, die das Personnel nicht hat (z. B. 2. TE oder FB in einer anderen Ansicht): nächster Spieler der Position aus dem Roster
+      const taken = new Set(Object.values(oa).map(a => a.id));
+      for (const p of V.offense) {
+        if (oa[p.role] || p.pos === 'OL') continue;
+        const a = depthOrder(scoped('athletes').filter(x => x.position === p.pos && !taken.has(x.id)))[0];
+        if (a) { taken.add(a.id); oa[p.role] = a; o[p.role] = a.lastName || fullName(a); }
       }
     }
     const dp = play.defensePersonnelId ? get('personnel', play.defensePersonnelId) : null;
@@ -279,7 +314,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   const speedOf = (p, side) => { const a = side === 'offense' ? M.oa[p.role] : M.da[p.role]; return a ? athleteSpeedYps(a) : null; };
 
   const save = () => upsert('plays', play);
-  function recompute() { M = maps(); ed.sim = simulate(play, speedOf); drawResults(); }
+  function recompute() { buildView(); M = maps(); ed.sim = simulate(V, speedOf); drawResults(); drawViewBar(); }
 
   // ---------- Zeichnen ----------
   function draw() {
@@ -288,25 +323,25 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     if (inSim) {
       const i = clamp(Math.round(ed.t / DT), 0, ed.sim.frames.length - 1);
       const fr = ed.sim.frames[i];
-      content += routesSVG(play.offense, { faint: true });
+      content += routesSVG(V.offense, { faint: true });
       // Spuren
-      for (const p of play.offense.filter(p => isEligible(p) && p.route?.length)) {
+      for (const p of V.offense.filter(p => isEligible(p) && p.route?.length)) {
         const pts = ed.sim.frames.slice(0, i + 1).filter((_, k) => k % 2 === 0).map(f => `${f2(f.o[p.id].x)},${f2(-f.o[p.id].y)}`).join(' ');
         content += `<polyline points="${pts}" fill="none" stroke="${colorOf(p)}" stroke-width=".22" opacity=".9"/>`;
       }
-      for (const d of play.defense) {
+      for (const d of V.defense) {
         const pts = ed.sim.frames.slice(0, i + 1).filter((_, k) => k % 3 === 0).map(f => `${f2(f.d[d.id].x)},${f2(-f.d[d.id].y)}`).join(' ');
         content += `<polyline points="${pts}" fill="none" stroke="#ff6b5b" stroke-width=".12" opacity=".5"/>`;
       }
-      const sepNow = Object.fromEntries(Object.entries(ed.sim.separation).map(([k, v]) => [k, v[i]]));
-      content += playersSVG(play, { pos: fr, sel: ed.sel, names: M.names, sepNow, invert: isDef });
+      const sepNow = ed.showDef ? Object.fromEntries(Object.entries(ed.sim.separation).map(([k, v]) => [k, v[i]])) : null;
+      content += playersSVG(V, { pos: fr, sel: ed.sel, names: M.names, sepNow, invert: isDef });
     } else {
-      content += assignmentsSVG(play, { sel: ed.sel, showZones: ed.showZones });
-      content += routesSVG(play.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
-      content += playersSVG(play, { sel: ed.sel, names: M.names });
+      content += assignmentsSVG(V, { sel: ed.sel, showZones: ed.showZones });
+      content += routesSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
+      content += playersSVG(V, { sel: ed.sel, names: M.names });
       // Griffe für Routenpunkte
-      if (ed.mode === 'draw' && ed.sel?.side === 'o') {
-        const p = play.offense.find(x => x.id === ed.sel.id);
+      if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
+        const p = V.offense.find(x => x.id === ed.sel.id);
         (p?.route || []).forEach((q, k) => {
           content += `<circle data-handle="${k}" cx="${f2(q.x)}" cy="${f2(-q.y)}" r=".55" fill="${colorOf(p)}" stroke="#0b0c0e" stroke-width=".12" style="cursor:move"/>`;
         });
@@ -319,7 +354,12 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   }
 
   function drawHint() {
-    const p = ed.sel?.side === 'o' ? play.offense.find(x => x.id === ed.sel.id) : null;
+    if (!editable()) {
+      $('#hint').innerHTML = `Ansicht in <b>${ed.pers} Personnel</b> – automatisch aus dem Konzept abgeleitet. Bearbeiten in <a href="javascript:void 0" id="toBase">${basePers()} Personnel</a> (Basis).`;
+      $('#toBase').onclick = () => setPers(basePers());
+      return;
+    }
+    const p = ed.sel?.side === 'o' ? V.offense.find(x => x.id === ed.sel.id) : null;
     $('#hint').innerHTML = ed.mode === 'draw'
       ? (p && isEligible(p) ? `Route für <b>${esc(p.role)}</b>: aufs Feld klicken, um Punkte zu setzen. Punkte lassen sich ziehen, Doppelklick löscht einen Punkt. <span class="kbd">⌫</span> entfernt den letzten, <span class="kbd">Esc</span> beendet.`
         : 'Erst einen Receiver (WR, TE, RB) antippen, dann Punkte aufs Feld setzen.')
@@ -333,13 +373,13 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       return;
     }
     if (ed.sel.side === 'o') {
-      const p = play.offense.find(x => x.id === ed.sel.id);
+      const p = V.offense.find(x => x.id === ed.sel.id);
       if (!p) { ed.sel = null; return drawSide(); }
       const a = M.oa[p.role], sp = (a && athleteSpeedYps(a)) || defaultSpeed(p.pos);
       card.innerHTML = `<h3>Offense · ${esc(p.role)}</h3>
         <div style="margin-bottom:8px"><b>${a ? esc(fullName(a)) : esc(p.pos)}</b>
         <div class="small muted">Topspeed ${(sp / 1.09361 * 3.6).toFixed(1).replace('.', ',')} km/h ${a ? '(gemessen)' : '(Standardwert)'}</div></div>
-        ${isEligible(p) ? `
+        ${!editable() ? `<p class="small muted" style="margin:0">Route: <b>${esc(p.routeName || '–')}</b>. Ändern in ${basePers()} Personnel (Basis).</p>` : isEligible(p) ? `
           <div class="field"><label>Route aus dem Routenbaum</label></div>
           <div class="btn-grid" style="margin:6px 0 10px">${Object.keys(ROUTES).map(r => `<button class="sm ${p.routeName === r ? 'on' : ''}" data-route="${esc(r)}">${esc(r)}</button>`).join('')}</div>
           <div class="btn-grid">
@@ -354,18 +394,18 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       card.querySelector('#undoPt')?.addEventListener('click', () => { p.route.pop(); p.routeName = p.route.length ? 'Freie Route' : ''; commit(); });
       card.querySelector('#clearRoute')?.addEventListener('click', () => { p.route = []; p.routeName = ''; commit(); });
     } else {
-      const d = play.defense.find(x => x.id === ed.sel.id);
+      const d = V.defense.find(x => x.id === ed.sel.id);
       if (!d) { ed.sel = null; return drawSide(); }
       const a = M.da[d.role];
       const val = d.assign.type === 'man' ? 'man:' + d.assign.target : d.assign.type === 'zone' ? 'zone:' + d.assign.zone : 'rush';
       const opts = [{ value: 'rush', label: 'Pass Rush / Blitz' },
-        ...play.offense.filter(isEligible).map(p => ({ value: 'man:' + p.id, label: `Mann gegen ${p.role}` })),
+        ...V.offense.filter(isEligible).map(p => ({ value: 'man:' + p.id, label: `Mann gegen ${p.role}` })),
         ...Object.entries(ZONES).map(([k, z]) => ({ value: 'zone:' + k, label: 'Zone: ' + z.label }))];
       card.innerHTML = `<h3>Defense · ${esc(d.role)}</h3>
         <div style="margin-bottom:8px"><b>${a ? esc(fullName(a)) : esc(d.pos)}</b>
-        <div class="small muted">${esc(assignmentLabel(d, play.offense))}</div></div>
-        <div class="field"><label>Aufgabe</label><select id="assignSel">${options(opts, val)}</select></div>`;
-      card.querySelector('#assignSel').onchange = e => {
+        <div class="small muted">${esc(assignmentLabel(d, V.offense))}</div></div>
+        ${editable() ? `<div class="field"><label>Aufgabe</label><select id="assignSel">${options(opts, val)}</select></div>` : `<p class="small muted" style="margin:0">Aufgaben ändern in ${basePers()} Personnel (Basis).</p>`}`;
+      if (editable()) card.querySelector('#assignSel').onchange = e => {
         const v = e.target.value;
         d.assign = v === 'rush' ? { type: 'rush' } : v.startsWith('man:') ? { type: 'man', target: v.slice(4) } : { type: 'zone', zone: v.slice(5) };
         play.defenseLocked = true; commit();
@@ -393,7 +433,8 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
 
   function drawResults() {
     const el = $('#results');
-    const rec = play.offense.filter(p => isEligible(p) && p.route?.length);
+    if (!ed.showDef) { el.innerHTML = '<p class="muted small" style="margin:0">Defense einblenden, um zu sehen, wer wann offen ist.</p>'; return; }
+    const rec = V.offense.filter(p => isEligible(p) && p.route?.length);
     if (!rec.length) { el.innerHTML = '<p class="muted small" style="margin:0">Gib mindestens einem Receiver eine Route, dann siehst du hier, wer wann offen ist.</p>'; return; }
     const times = [1.5, 2, 2.5, 3, 3.5].filter(t => t <= play.duration);
     const idx = t => Math.min(ed.sim.frames.length - 1, Math.round(t / DT));
@@ -413,6 +454,20 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
         : '<span class="sep-good" style="padding:0 4px">≥ 3 yd offen</span> <span class="sep-mid" style="padding:0 4px">1,5–3 yd eng</span> <span class="sep-bad" style="padding:0 4px">&lt; 1,5 yd gedeckt</span>'}
       · Zeitpunkt anklicken, um ihn auf dem Feld zu sehen. Vereinfachtes Modell – Speeds aus den Messwerten (Max V bzw. 40 yd), sonst Standardwerte.</p>`;
     el.querySelectorAll('[data-t]').forEach(td => td.onclick = () => { stop(); ed.t = +td.dataset.t; draw(); });
+  }
+
+  function drawViewBar() {
+    const seg = $('#persSeg');
+    seg.innerHTML = PERS_KEYS.map(k => `<button data-p="${k}" class="${ed.pers === k ? 'on' : ''}" title="${k === basePers() ? 'Basis – hier bearbeitbar' : 'Ansicht'}">${k}${k === basePers() ? ' •' : ''}</button>`).join('');
+    seg.querySelectorAll('[data-p]').forEach(b => b.onclick = () => setPers(b.dataset.p));
+    const t = $('#defToggle');
+    if (t) { t.textContent = ed.showDef ? '🛡 Defense ausblenden' : '🛡 Defense einblenden'; t.classList.toggle('on', ed.showDef); }
+  }
+
+  function setPers(k) {
+    stop(); ed.t = 0; ed.pers = k; ed.sel = null;
+    if (ed.mode === 'draw' && !editable()) ed.mode = 'move';
+    recompute(); draw(); drawSide(); drawHint();
   }
 
   function commit({ realign = false } = {}) {
@@ -456,7 +511,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     const f = toField(e);
     const handle = e.target.closest('[data-handle]');
     const g = e.target.closest('[data-pid]');
-    if (handle && ed.sel?.side === 'o') {
+    if (handle && ed.sel?.side === 'o' && editable()) {
       ed.drag = { kind: 'pt', k: +handle.dataset.handle, moved: false };
       svg.setPointerCapture(e.pointerId);
       return;
@@ -464,7 +519,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     if (g) {
       const [side, pid] = g.dataset.pid.split(':');
       ed.sel = { side, id: pid };
-      if (ed.mode === 'move') {
+      if (ed.mode === 'move' && editable()) {
         const obj = (side === 'o' ? play.offense : play.defense).find(x => x.id === pid);
         ed.drag = { kind: 'player', obj, side, dx: obj.x - f.x, dy: obj.y - f.y, moved: false, sx: obj.x, sy: obj.y };
         svg.setPointerCapture(e.pointerId);
@@ -472,7 +527,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       draw(); drawSide(); drawHint();
       return;
     }
-    if (ed.mode === 'draw' && ed.sel?.side === 'o') {
+    if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
       const p = play.offense.find(x => x.id === ed.sel.id);
       if (p && isEligible(p)) {
         p.route = p.route || [];
@@ -535,7 +590,15 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   document.addEventListener('keydown', onKey);
 
   // ---------- Panels ----------
-  root.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+  root.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => {
+    if (b.dataset.m === 'draw' && !editable()) { toast(`Routen zeichnen in ${basePers()} Personnel (Basis)`); return; }
+    setMode(b.dataset.m);
+  });
+  if ($('#defToggle')) $('#defToggle').onclick = () => {
+    ed.showDef = !ed.showDef; localStorage.setItem('huskies.showDef', ed.showDef ? '1' : '0');
+    if (!ed.showDef && ed.sel?.side === 'd') ed.sel = null;
+    stop(); ed.t = 0; recompute(); draw(); drawSide();
+  };
   $('#zonesChk').onchange = e => { ed.showZones = e.target.checked; draw(); };
   $('#name').onchange = e => { play.name = e.target.value.trim() || play.name; save(); toast('Gespeichert'); };
   $('#notes').onchange = e => { play.notes = e.target.value; save(); };
@@ -544,7 +607,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     const apply = () => {
       play.formation = e.target.value; play.offense = formationPlayers(play.formation);
       if (isDef && play.opponentConcept) applyConcept(play.offense, play.opponentConcept);
-      ed.sel = null; play.defenseLocked = false; commit({ realign: true });
+      ed.sel = null; play.defenseLocked = false; ed.pers = basePers(); commit({ realign: true });
     };
     if (!isDef && play.offense.some(p => p.route?.length)) {
       confirmDialog('Neue Formation setzt alle Spieler zurück und löscht die Routen. Fortfahren?', apply, 'Formation wechseln');
@@ -557,7 +620,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     const c = OFFENSE_CONCEPTS[play.opponentConcept];
     if (c) {
       // Formation des Konzepts übernehmen, Routen setzen
-      if (c.formation !== play.formation) { play.formation = c.formation; play.offense = formationPlayers(c.formation); $('#formSel').value = c.formation; }
+      if (c.formation !== play.formation) { play.formation = c.formation; play.offense = formationPlayers(c.formation); $('#formSel').value = c.formation; ed.pers = basePers(); }
       applyConcept(play.offense, play.opponentConcept);
       if (ed.sel?.side === 'o') ed.sel = null;
       commit({ realign: true });

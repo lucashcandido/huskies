@@ -71,6 +71,17 @@ export const FORMATIONS = {
     { role: 'QB', pos: 'QB', x: CX, y: -1.8 }, { role: 'RB', pos: 'RB', x: CX, y: -7 },
     { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'U', pos: 'TE', x: CX - 6, y: -1.5 },
     { role: 'Y', pos: 'TE', x: CX + 6, y: -1.5 }, { role: 'Z', pos: 'WR', x: W - 8, y: -2 }] },
+  'trips10': { label: 'Trips Right (4 WR)', personnel: '10', players: () => [...ol(),
+    { role: 'QB', pos: 'QB', x: CX, y: -5 }, { role: 'RB', pos: 'RB', x: CX - 2.3, y: -5 },
+    { role: 'X', pos: 'WR', x: 6, y: -1 },
+    { role: 'Y', pos: 'WR', x: W - 19, y: -2 }, { role: 'H', pos: 'WR', x: W - 13, y: -2 }, { role: 'Z', pos: 'WR', x: W - 6, y: -1 }] },
+  'trips12': { label: 'Trips Right (2 TE)', personnel: '12', players: () => [...ol(),
+    { role: 'QB', pos: 'QB', x: CX, y: -5 }, { role: 'RB', pos: 'RB', x: CX - 2.3, y: -5 },
+    { role: 'X', pos: 'WR', x: 6, y: -1 },
+    { role: 'Y', pos: 'TE', x: CX + 6, y: -1.5 }, { role: 'U', pos: 'TE', x: W - 15, y: -2 }, { role: 'Z', pos: 'WR', x: W - 6, y: -1 }] },
+  'jumbo22': { label: 'I-Form 22 (2 TE)', personnel: '22', players: () => [...ol(),
+    { role: 'QB', pos: 'QB', x: CX, y: -1.8 }, { role: 'FB', pos: 'FB', x: CX, y: -4.5 }, { role: 'RB', pos: 'RB', x: CX, y: -7 },
+    { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'U', pos: 'TE', x: CX - 6, y: -1.5 }, { role: 'Y', pos: 'TE', x: CX + 6, y: -1.5 }] },
   'proI': { label: 'Pro I (21)', personnel: '21', players: () => [...ol(),
     { role: 'QB', pos: 'QB', x: CX, y: -1.8 }, { role: 'FB', pos: 'FB', x: CX, y: -4.5 }, { role: 'RB', pos: 'RB', x: CX, y: -7 },
     { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'Y', pos: 'TE', x: CX + 6, y: -1.5 }, { role: 'Z', pos: 'WR', x: W - 8, y: -2 }] },
@@ -127,6 +138,45 @@ export function applyConcept(players, key) {
     if (p) { p.route = routePoints(r, p); p.routeName = r; }
   }
   return players;
+}
+
+// ---------- Dasselbe Konzept in anderem Personnel ----------
+// Konzepte werden in „11-Rollen“ gedacht (X, Z, H, Y, RB). In anderen Personnel-Gruppen
+// übernimmt ein anderer Spieler die Rolle, die Formation passt sich an.
+export const PERS_KEYS = ['10', '11', '12', '21', '22'];
+const ROLE_MAP = { '10': {}, '11': {}, '12': { H: 'U' }, '21': { H: 'FB' }, '22': { H: 'U', Z: 'FB' } };
+const FORM_BY = {
+  '10': { doubles: 'spread', trips: 'trips10' }, '11': { doubles: 'doubles', trips: 'trips' },
+  '12': { doubles: 'ace12', trips: 'trips12' }, '21': { doubles: 'proI', trips: 'proI' }, '22': { doubles: 'jumbo22', trips: 'jumbo22' },
+};
+export const personnelOf = formation => FORMATIONS[formation]?.personnel || '11';
+export const familyOf = formation => (['trips', 'bunch', 'empty', 'trips10', 'trips12'].includes(formation) ? 'trips' : 'doubles');
+const canonRole = (role, pers) => Object.entries(ROLE_MAP[pers] || {}).find(([, a]) => a === role)?.[0] || role;
+
+/** Routen relativ zum Startpunkt (dx Richtung Feldmitte), je 11-Rolle */
+export function relRoutes(offense, pers) {
+  const out = {};
+  for (const p of offense) {
+    if (!isEligible(p) || !p.route?.length) continue;
+    const s = p.x < CX ? 1 : -1;
+    out[canonRole(p.role, pers)] = { name: p.routeName, pts: p.route.map(q => [(q.x - p.x) * s, q.y - p.y]) };
+  }
+  return out;
+}
+
+/** Erzeugt die Offense eines Konzepts in einem anderen Personnel */
+export function offenseIn(pers, family, rel) {
+  const formation = FORM_BY[pers]?.[family] || FORM_BY['11'][family];
+  const players = formationPlayers(formation);
+  for (const [canon, r] of Object.entries(rel)) {
+    const role = ROLE_MAP[pers]?.[canon] || canon;
+    const p = players.find(x => x.role === role);
+    if (!p) continue;
+    const s = p.x < CX ? 1 : -1;
+    p.route = r.pts.map(([dx, dy]) => ({ x: clamp(p.x + dx * s, 0.5, W - 0.5), y: p.y + dy }));
+    p.routeName = r.name;
+  }
+  return { formation, players };
 }
 
 /** Wandelt eine Routen-Vorlage in absolute Punkte für einen Spieler um */
