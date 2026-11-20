@@ -9,7 +9,7 @@ import { openAthlete } from './athletes.js';
 import { scoped, currentTeam } from '../team.js';
 import { OFFENSE_SLOTS, DEFENSE_SLOTS, EXTRA_SLOTS, ALL_SLOTS, SLOT, lineup, slotOf } from '../lineup.js';
 
-const KEY_METRICS = ['forty', 'shuffle', 'maxVelocity', 'vertical', 'broad', 'weight'];
+const KEY_METRICS = ['forty', 'shuffle', 'maxVelocity', 'vertical', 'broad', 'bench', 'weight'];
 const view = { tab: 'lineup' };
 
 /** Spieler in Depth-Reihenfolge (ohne Angabe: nach 40-yd-Zeit) */

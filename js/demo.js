@@ -16,6 +16,8 @@ const LAST = ['Becker', 'Schulz', 'Hoffmann', 'Krüger', 'Wagner', 'Neumann', 'B
   'Thomas', 'Scholz', 'Schmitz', 'Beck', 'Weiß', 'Lang', 'Ahmeti', 'Okafor', 'Yilmaz', 'Mensah', 'Kowalski', 'Nowak', 'Petrović', 'Rossi'];
 
 // Profil je Position (U19-Niveau): [Gewicht, 40yd, Shuffle, L-Cone, Broad, Vertical, MaxV]
+// Bench Press (Maximalgewicht kg) je Position
+export const BENCH = { QB: 75, RB: 95, FB: 110, WR: 75, TE: 100, OL: 125, DL: 120, LB: 105, CB: 70, S: 80, K: 65, P: 65 };
 const PROFILE = {
   QB: [80, 5.0, 4.6, 7.6, 235, 58, 28.5], RB: [80, 4.8, 4.45, 7.4, 250, 64, 30.5], FB: [92, 5.0, 4.6, 7.6, 238, 58, 28.8],
   WR: [74, 4.75, 4.4, 7.3, 252, 66, 31.0], TE: [92, 5.05, 4.65, 7.7, 235, 58, 28.5], OL: [118, 5.6, 5.0, 8.3, 205, 44, 25.0],
@@ -27,11 +29,11 @@ const MIX_SMALL = { QB: 2, RB: 2, WR: 4, TE: 1, OL: 5, DL: 4, LB: 3, CB: 3, S: 2
 
 // Niveau je Altersklasse: Zeiten ×t, Sprünge ×j, Gewicht ×w, Max V ×v, Geburtsjahre
 export const LEVELS = {
-  youth:   { t: 1.17, j: 0.74, w: 0.62, v: 0.82, born: [2014, 2015], mix: MIX_SMALL },
-  junior:  { t: 1.07, j: 0.87, w: 0.84, v: 0.92, born: [2011, 2013], mix: MIX_FULL },
-  u20:     { t: 1.0,  j: 1.0,  w: 1.0,  v: 1.0,  born: [2007, 2010], mix: MIX_FULL },
-  senior:  { t: 0.975, j: 1.04, w: 1.06, v: 1.03, born: [1992, 2006], mix: { ...MIX_FULL, OL: 9, DL: 7, WR: 8 } },
-  prospect:{ t: 1.02, j: 0.97, w: 0.97, v: 0.98, born: [2008, 2010], mix: { QB: 1, RB: 2, WR: 3, TE: 1, OL: 2, DL: 2, LB: 2, CB: 2, S: 1 } },
+  youth:   { t: 1.17, j: 0.74, w: 0.62, v: 0.82, b: 0.45, born: [2014, 2015], mix: MIX_SMALL },
+  junior:  { t: 1.07, j: 0.87, w: 0.84, v: 0.92, b: 0.7, born: [2011, 2013], mix: MIX_FULL },
+  u20:     { t: 1.0,  j: 1.0,  w: 1.0,  v: 1.0,  b: 1.0, born: [2007, 2010], mix: MIX_FULL },
+  senior:  { t: 0.975, j: 1.04, w: 1.06, v: 1.03, b: 1.12, born: [1992, 2006], mix: { ...MIX_FULL, OL: 9, DL: 7, WR: 8 } },
+  prospect:{ t: 1.02, j: 0.97, w: 0.97, v: 0.98, b: 0.97, born: [2008, 2010], mix: { QB: 1, RB: 2, WR: 3, TE: 1, OL: 2, DL: 2, LB: 2, CB: 2, S: 1 } },
 };
 /** Passendes Niveau aus dem Teamnamen raten */
 export function levelFor(name) {
@@ -84,6 +86,7 @@ export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 
         broad: Math.round(r(br * L.j, 0.06, k, false)),
         vertical: Math.round(r(ve * L.j, 0.08, k, false) * 2) / 2,
         maxVelocity: Math.round(r(mv * L.v, 0.04, k, false) * 10) / 10,
+        bench: Math.round(r(BENCH[pos] * L.b, 0.1, k * 2, false) / 2.5) * 2.5,
       }));
       if (rnd() < 0.22) ms = ms.slice(1);                 // nicht jede:r war bei jedem Test
       if (rnd() < 0.1) ms[ms.length - 1].vertical = null; // vereinzelt fehlende Werte

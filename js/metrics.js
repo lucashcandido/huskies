@@ -8,6 +8,7 @@ export const METRICS = [
   { key: 'lconeL',      label: 'L-Cone links',         short: 'L-Cone L', unit: 's',    step: 0.01, dec: 2, better: 'low',  min: 5,   max: 14 },
   { key: 'broad',       label: 'Broad Jump',           short: 'Broad',    unit: 'cm',   step: 1,    dec: 0, better: 'high', min: 80,  max: 400 },
   { key: 'vertical',    label: 'Vertical Jump',        short: 'Vertical', unit: 'cm',   step: 0.5,  dec: 1, better: 'high', min: 10,  max: 120 },
+  { key: 'bench',       label: 'Bench Press',          short: 'Bench',    unit: 'kg',   step: 2.5,  dec: 1, better: 'high', min: 15,  max: 250 },
   { key: 'maxVelocity', label: 'Max. Geschwindigkeit', short: 'Max V',    unit: 'km/h', step: 0.1,  dec: 1, better: 'high', min: 10,  max: 45 },
 ];
 export const METRIC = Object.fromEntries(METRICS.map(m => [m.key, m]));
