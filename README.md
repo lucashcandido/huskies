@@ -33,7 +33,7 @@ python3 -m http.server 8000
 
 ## Veröffentlichen
 
-Der Workflow `.github/workflows/pages.yml` veröffentlicht die App bei jedem Push auf `main` über GitHub Pages. Einmalig in den Repo-Einstellungen unter **Settings → Pages → Source** „GitHub Actions“ wählen.
+Die App läuft über GitHub Pages (Deploy from branch `main`): https://lucashcandido.github.io/huskies/ – jeder Push auf `main` wird automatisch veröffentlicht.
 
 ## Struktur
 
