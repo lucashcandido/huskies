@@ -2,6 +2,7 @@ import { db, upsert, remove, uid } from '../store.js';
 import { METRICS, METRIC, POSITIONS, fullName, ageOf, metricValue, latestValue, fmt, fmtMetric, parseNum,
   plausibility, quartileClass, sortedMeasurements, today, fmtDate, bestValue } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options, sparkline } from '../ui.js';
+import { scoped, currentTeamId, teams } from '../team.js';
 
 const view = { q: '', pos: '', roster: '', mode: 'latest', sort: 'name', dir: 1 };
 
@@ -19,7 +20,7 @@ export function render(root) {
     <div class="toolbar">
       <input class="grow" id="q" placeholder="Suche nach Name …" value="${esc(view.q)}">
       <select id="pos">${options(POSITIONS, view.pos, { empty: 'Alle Positionen' })}</select>
-      <select id="roster">${options(s.rosters.map(r => ({ value: r.id, label: r.name })), view.roster, { empty: 'Alle Roster' })}</select>
+      <select id="roster">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), view.roster, { empty: 'Alle Roster' })}</select>
       <div class="seg" id="mode">
         <button data-m="latest" class="${view.mode === 'latest' ? 'on' : ''}">Aktuell</button>
         <button data-m="best" class="${view.mode === 'best' ? 'on' : ''}">Bestwert</button>
@@ -44,7 +45,7 @@ export function render(root) {
 function filtered() {
   const s = db();
   const q = view.q.trim().toLowerCase();
-  let list = s.athletes;
+  let list = scoped('athletes');
   if (q) list = list.filter(a => fullName(a).toLowerCase().includes(q));
   if (view.pos) list = list.filter(a => a.position === view.pos);
   if (view.roster) {
@@ -58,7 +59,7 @@ function filtered() {
 function drawTable(root) {
   const list = filtered();
   const statsEl = root.querySelector('#stats');
-  const all = db().athletes;
+  const all = scoped('athletes');
   const measured = all.filter(a => (a.measurements || []).length).length;
   const lastDate = all.flatMap(a => (a.measurements || []).map(m => m.date)).sort().pop();
   statsEl.innerHTML = `
@@ -116,7 +117,7 @@ function drawTable(root) {
 
 /** Detail-/Bearbeitungsdialog einer Athletin / eines Athleten */
 export function openAthlete(existing, onDone) {
-  const a = existing ? structuredClone(existing) : { id: uid('ath'), firstName: '', lastName: '', birthDate: '', age: null, position: '', notes: '', measurements: [] };
+  const a = existing ? structuredClone(existing) : { id: uid('ath'), teamId: currentTeamId(), firstName: '', lastName: '', birthDate: '', age: null, position: '', notes: '', measurements: [] };
   const isNew = !existing;
   if (isNew) a.measurements.push({ id: 'm_' + today(), date: today() });
 
@@ -127,6 +128,7 @@ export function openAthlete(existing, onDone) {
       <div class="field"><label>Geburtsdatum</label><input id="bd" type="date" value="${esc(a.birthDate || '')}"></div>
       <div class="field"><label>Alter <span style="text-transform:none">(falls kein Geb.-Datum)</span></label><input id="age" type="number" min="5" max="60" value="${a.age ?? ''}"></div>
       <div class="field"><label>Position</label><select id="posSel">${options(POSITIONS, a.position, { empty: '–' })}</select></div>
+      ${teams().length > 1 ? `<div class="field"><label>Team</label><select id="teamSel">${options(teams().map(t => ({ value: t.id, label: t.name })), a.teamId)}</select></div>` : ''}
       <div class="field full"><label>Notizen</label><textarea id="notes" rows="2">${esc(a.notes || '')}</textarea></div>
     </div>
     <div id="sparks"></div>
@@ -206,6 +208,7 @@ export function openAthlete(existing, onDone) {
     a.age = a.birthDate ? null : parseNum(ageInput.value);
     a.position = root.querySelector('#posSel').value;
     a.notes = root.querySelector('#notes').value;
+    if (root.querySelector('#teamSel')) a.teamId = root.querySelector('#teamSel').value;
     if (!a.firstName && !a.lastName) { alert('Bitte mindestens einen Namen eintragen.'); return false; }
     // Leere Messtage verwerfen
     a.measurements = a.measurements.filter(m => METRICS.some(x => m[x.key] !== null && m[x.key] !== undefined && m[x.key] !== ''));
@@ -220,7 +223,7 @@ export function openAthlete(existing, onDone) {
 export function measurementsCSV() {
   const head = ['Nachname', 'Vorname', 'Position', 'Geburtsdatum', 'Alter am Messtag', 'Datum', ...METRICS.map(m => `${m.label} (${m.unit})`)];
   const lines = [head];
-  for (const a of db().athletes) {
+  for (const a of scoped('athletes')) {
     for (const m of sortedMeasurements(a)) {
       lines.push([a.lastName, a.firstName, a.position, a.birthDate || '', ageOf(a, m.date) ?? '', m.date,
         ...METRICS.map(x => m[x.key] === null || m[x.key] === undefined ? '' : String(m[x.key]).replace('.', ','))]);

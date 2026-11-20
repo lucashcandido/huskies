@@ -2,6 +2,7 @@ import { db, upsert, remove, uid, get } from '../store.js';
 import { METRICS, METRIC, POSITIONS, fullName, ageOf, metricValue, fmtMetric, fmt } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
 import { openAthlete } from './athletes.js';
+import { scoped, currentTeamId, currentTeam } from '../team.js';
 
 const KEY_METRICS = ['forty', 'shuffle', 'maxVelocity', 'vertical', 'broad', 'weight'];
 
@@ -15,8 +16,9 @@ export function render(root, params) {
     </div>
     <div class="cards" id="cards"></div>`;
   const cards = root.querySelector('#cards');
-  if (!s.rosters.length) cards.outerHTML = `<div class="empty">Noch kein Roster. Lege eins an (z. B. „U19 Saison 2027“) und füge Spieler hinzu.</div>`;
-  else cards.innerHTML = s.rosters.map(r => {
+  const list = scoped('rosters');
+  if (!list.length) cards.outerHTML = `<div class="empty">Noch kein Roster. Lege eins an (z. B. „U19 Saison 2027“) und füge Spieler hinzu.</div>`;
+  else cards.innerHTML = list.map(r => {
     const byPos = {};
     r.members.forEach(m => { byPos[m.position || '–'] = (byPos[m.position || '–'] || 0) + 1; });
     return `<div class="card click" data-id="${r.id}">
@@ -32,7 +34,7 @@ export function render(root, params) {
 
 function editRoster(r) {
   const isNew = !r;
-  r = r ? structuredClone(r) : { id: uid('ros'), name: '', team: '', season: String(new Date().getFullYear()), notes: '', members: [] };
+  r = r ? structuredClone(r) : { id: uid('ros'), teamId: currentTeamId(), name: '', team: currentTeam()?.name || '', season: String(new Date().getFullYear()), notes: '', members: [] };
   modal({
     title: isNew ? 'Neues Roster' : 'Roster bearbeiten', width: 560,
     body: `<div class="grid">
@@ -176,8 +178,8 @@ function nextDepth(r, pos, exceptId) {
 
 function addMembers(r, onDone) {
   const inRoster = new Set(r.members.map(m => m.athleteId));
-  const candidates = db().athletes.filter(a => !inRoster.has(a.id)).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
-  if (!candidates.length) { alert(db().athletes.length ? 'Alle Athlet:innen sind bereits im Roster.' : 'Lege zuerst Athlet:innen an.'); return; }
+  const candidates = scoped('athletes').filter(a => !inRoster.has(a.id)).sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
+  if (!candidates.length) { alert(scoped('athletes').length ? 'Alle Athlet:innen sind bereits im Roster.' : 'Lege zuerst Athlet:innen an.'); return; }
   const sel = new Set();
   modal({
     title: `Spieler zu „${r.name}“ hinzufügen`, width: 640,

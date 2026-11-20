@@ -4,6 +4,8 @@ import { today } from './metrics.js';
 import { measurementsCSV } from './views/athletes.js';
 import { demoData } from './demo.js';
 import * as sync from './sync.js';
+import { teams, currentTeam, setTeam, clearTeam, createTeam, renameTeam, teamUsage, untaggedCount, adoptUntagged } from './team.js';
+import { persist } from './store.js';
 import * as athletes from './views/athletes.js';
 import * as testday from './views/testday.js';
 import * as rosters from './views/rosters.js';
@@ -28,7 +30,12 @@ function route() {
   if (typeof cleanup === 'function') cleanup();
   cleanup = null;
   app.innerHTML = '';
-  if (needsSetup()) { renderSetup(app); return; }
+  const chip = document.getElementById('teamChip');
+  if (needsSetup()) { chip.classList.add('hidden'); renderSetup(app); return; }
+  const team = currentTeam();
+  if (!team) { chip.classList.add('hidden'); renderTeamPicker(app); return; }
+  chip.classList.remove('hidden');
+  chip.querySelector('span').textContent = team.name;
   const hash = location.hash.replace(/^#\/?/, '') || 'athletes';
   const [name, ...params] = hash.split('/');
   const view = routes[name] || athletes;
@@ -60,6 +67,58 @@ sync.onStatus(s => {
   pill.title = sync.config() ? `Verbunden als ${sync.config().coach} mit ${sync.config().repo}` : 'Daten liegen nur auf diesem Gerät';
 });
 pill.onclick = () => openDataMenu();
+
+// ---------- Team-Auswahl ----------
+document.getElementById('teamChip').onclick = () => { clearTeam(); route(); };
+
+function renderTeamPicker(root) {
+  document.querySelectorAll('#nav a').forEach(a => a.classList.remove('active'));
+  const list = teams();
+  const prev = localStorage.getItem('huskies.lastTeam');
+  const count = t => { const u = teamUsage(t.id); return `${u.athletes} Athlet:innen · ${u.plays} Spielzüge`; };
+  root.innerHTML = `
+    <div class="setup">
+      <div class="card">
+        <h1>Team wählen</h1>
+        <p class="muted">Die Auswahl gilt für dieses Gerät, bis du sie oben über den Team-Button wechselst.</p>
+        ${list.length ? `<div class="team-list">${list.map(t => `<button class="team-btn ${t.id === prev ? 'cur' : ''}" data-id="${t.id}">${esc(t.name)}<small>${count(t)}</small></button>`).join('')}</div>`
+          : '<div class="empty" style="margin:14px 0">Noch kein Team angelegt.</div>'}
+        <div class="section-title">Neues Team</div>
+        <div class="row"><input id="tn" class="grow" placeholder="z. B. U15, U19, Herren" style="flex:1"><button class="primary" id="tadd">Anlegen</button></div>
+        <div id="tmsg"></div>
+        ${list.length ? '<p style="margin:16px 0 0;text-align:center"><a href="javascript:void 0" id="manage" class="small">Teams umbenennen</a></p>' : ''}
+      </div>
+    </div>`;
+  const pick = id => {
+    setTeam(id); localStorage.setItem('huskies.lastTeam', id);
+    const loose = untaggedCount();
+    route();
+    if (loose) confirmDialog(`Es gibt ${loose} Einträge ohne Team (aus einer älteren Version). Dem Team „${currentTeam().name}“ zuordnen?`,
+      () => { adoptUntagged(id); persist(); route(); toast('Zugeordnet'); }, 'Zuordnen');
+  };
+  root.querySelectorAll('[data-id]').forEach(b => b.onclick = () => pick(b.dataset.id));
+  const add = async () => {
+    const name = root.querySelector('#tn').value.trim();
+    const msg = t => { root.querySelector('#tmsg').innerHTML = t ? `<div class="msg err">${esc(t)}</div>` : ''; };
+    if (!name) return msg('Bitte einen Namen eingeben.');
+    root.querySelector('#tadd').disabled = true;
+    if (sync.config()) await sync.syncNow();       // erst abgleichen, damit kein Team doppelt entsteht
+    const dup = teams().find(t => t.name.toLowerCase() === name.toLowerCase());
+    if (dup) { pick(dup.id); return; }
+    pick(createTeam(name).id);
+  };
+  root.querySelector('#tadd').onclick = add;
+  root.querySelector('#tn').onkeydown = e => { if (e.key === 'Enter') add(); };
+  root.querySelector('#manage')?.addEventListener('click', () => {
+    modal({
+      title: 'Teams umbenennen', width: 460,
+      body: list.map(t => `<div class="field" style="margin-bottom:8px"><input data-r="${t.id}" value="${esc(t.name)}"></div>`).join(''),
+      buttons: [{ label: 'Abbrechen', cls: 'ghost' }, { label: 'Speichern', cls: 'primary', onClick: (close, r) => {
+        r.querySelectorAll('[data-r]').forEach(i => renameTeam(i.dataset.r, i.value)); route();
+      } }],
+    });
+  });
+}
 
 // ---------- Einrichtung ----------
 function renderSetup(root) {
@@ -166,7 +225,7 @@ function openAccessDialog(fresh = false) {
 function openDataMenu() {
   const s = db();
   const cfg = sync.config();
-  const n = `${s.athletes.length} Athlet:innen · ${s.rosters.length} Roster · ${s.personnel.length} Personnel · ${s.plays.length} Spielzüge`;
+  const n = `Insgesamt ${s.teams.length} Team(s) · ${s.athletes.length} Athlet:innen · ${s.rosters.length} Roster · ${s.personnel.length} Personnel · ${s.plays.length} Spielzüge`;
   const st = sync.getStatus();
   modal({
     title: 'Daten', width: 580,
@@ -215,7 +274,7 @@ function openDataMenu() {
           if (a === 'import' && cfg) confirmDialog('Das Backup ersetzt die Daten für ALLE Coaches. Fortfahren?', go, 'Ersetzen'); else go();
         }
         if (a === 'demo') {
-          const go = () => { replaceState(demoData()); toast('Beispieldaten geladen'); close(); route(); };
+          const go = () => { const d = demoData(); replaceState(d); setTeam(d.teams[0].id); toast('Beispieldaten geladen'); close(); route(); };
           if (db().athletes.length || cfg) confirmDialog(`Beispieldaten ersetzen alle vorhandenen Daten${cfg ? ' – für alle Coaches' : ''}. Fortfahren?`, go, 'Ersetzen');
           else go();
         }

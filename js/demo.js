@@ -93,5 +93,7 @@ export function demoData() {
     mkPlay('Four Verts vs Cover 3', 'doubles', 'cover3', { X: 'Go / Fade', H: 'Seam', Y: 'Seam', Z: 'Go / Fade', RB: 'Swing' }),
     mkPlay('Mesh vs Cover 1', 'trips', 'cover1', { X: 'Drag', Y: 'Drag', H: 'Corner', Z: 'Go / Fade', RB: 'Angle' }),
   ];
-  return { version: 1, athletes, rosters: [roster], personnel: [off11, defNickel], plays };
+  const team = { id: uid('team'), name: 'U19', order: 0 };
+  for (const x of [...athletes, roster, off11, defNickel, ...plays]) x.teamId = team.id;
+  return { version: 1, teams: [team], athletes, rosters: [roster], personnel: [off11, defNickel], plays };
 }

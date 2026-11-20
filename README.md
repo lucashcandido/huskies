@@ -4,6 +4,7 @@ Webapp für Combine-Messungen, Kaderplanung und Spielzüge. Läuft komplett im B
 
 ## Funktionen
 
+- **Team-Auswahl**: Beim Start wählt man einmal das Team (z. B. U15, U19, Herren). Die Wahl bleibt auf dem Gerät gespeichert und gilt für alle Bereiche; gewechselt wird über den blauen Team-Button oben. Athlet:innen lassen sich im Bearbeiten-Dialog einem anderen Team zuordnen.
 - **Athleten**: Stammdaten (Name, Geburtsdatum bzw. Alter, Position) und Messverlauf für Gewicht, 40 Yard Dash, Shuffle, L-Cone rechts/links, Broad Jump, Vertical Jump und Max. Geschwindigkeit. Sortierbare Tabelle mit Aktuell-/Bestwert-Ansicht, Einfärbung nach Vierteln, Verlauf je Messwert, Plausibilitätswarnungen.
 - **Testtag**: Schnellerfassung am Platz – *Station* (ein Test, alle Spieler, Enter = nächster) oder *Tabelle* (alle Tests). Jeder Wert wird sofort gespeichert.
 - **Roster**: Kader aus Athlet:innen zusammenstellen, mit Trikotnummer, Position, Depth Chart und Durchschnittswerten je Position. Druckbar.

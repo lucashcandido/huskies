@@ -1,6 +1,7 @@
 import { db, upsert, uid } from '../store.js';
 import { METRICS, METRIC, POSITIONS, fullName, latestValue, bestValue, fmtMetric, parseNum, plausibility, today, fmtDate } from '../metrics.js';
 import { esc, options, toast } from '../ui.js';
+import { scoped } from '../team.js';
 
 const view = { date: today(), roster: '', pos: '', mode: 'station', metric: 'forty', q: '' };
 
@@ -13,7 +14,7 @@ export function render(root) {
     </div>
     <div class="toolbar">
       <div class="field"><label>Datum</label><input type="date" id="date" value="${view.date}"></div>
-      <div class="field"><label>Roster</label><select id="roster">${options(s.rosters.map(r => ({ value: r.id, label: r.name })), view.roster, { empty: 'Alle Athlet:innen' })}</select></div>
+      <div class="field"><label>Roster</label><select id="roster">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), view.roster, { empty: 'Alle Athlet:innen' })}</select></div>
       <div class="field"><label>Position</label><select id="pos">${options(POSITIONS, view.pos, { empty: 'Alle' })}</select></div>
       <div class="field grow"><label>Suche</label><input id="q" value="${esc(view.q)}" placeholder="Name …"></div>
       <div class="field"><label>Modus</label><div class="seg" id="mode">
@@ -39,7 +40,7 @@ export function render(root) {
 
 function athletesInScope() {
   const s = db();
-  let list = [...s.athletes];
+  let list = scoped('athletes');
   if (view.roster) {
     const r = s.rosters.find(r => r.id === view.roster);
     const ids = new Set((r?.members || []).map(m => m.athleteId));
@@ -69,7 +70,7 @@ function drawBody(root) {
   const bar = root.querySelector('#metricBar');
   const body = root.querySelector('#body');
   const list = athletesInScope();
-  if (!db().athletes.length) {
+  if (!scoped('athletes').length) {
     bar.innerHTML = '';
     body.innerHTML = `<div class="empty">Noch keine Athlet:innen – lege sie zuerst unter <a href="#/athletes">Athleten</a> an.</div>`;
     return;

@@ -4,6 +4,7 @@ import { esc, modal, toast, confirmDialog, options } from '../ui.js';
 import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL } from '../football.js';
 import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js';
 import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js';
+import { scoped, currentTeamId } from '../team.js';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
@@ -14,7 +15,7 @@ const snap = v => Math.round(v * 2) / 2;
 // ======================= Liste =======================
 export function render(root, params) {
   if (params[0]) return renderEditor(root, params[0]);
-  const plays = [...db().plays].sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const plays = scoped('plays').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   root.innerHTML = `
     <div class="page-head">
       <div><h1>Playbook</h1><p class="muted">Formation wählen, Routen einzeichnen und gegen ein Defense-Konzept laufen lassen.</p></div>
@@ -36,13 +37,13 @@ function newPlay() {
     body: `<div class="grid">
       <div class="field full"><label>Name</label><input id="n" placeholder="z. B. Mesh vs Cover 3"></div>
       <div class="field full"><label>Formation</label><select id="f">${options(Object.entries(FORMATIONS).map(([k, v]) => ({ value: k, label: v.label })), 'doubles')}</select></div>
-      <div class="field full"><label>Offense-Personnel</label><select id="op">${options(s.personnel.filter(p => p.side === 'offense').map(p => ({ value: p.id, label: p.name })), '', { empty: '– ohne (nur Positionen) –' })}</select></div>
+      <div class="field full"><label>Offense-Personnel</label><select id="op">${options(scoped('personnel').filter(p => p.side === 'offense').map(p => ({ value: p.id, label: p.name })), '', { empty: '– ohne (nur Positionen) –' })}</select></div>
       <div class="field full"><label>Defense-Konzept</label><select id="c">${options(Object.entries(CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), 'cover3')}</select></div>
     </div>`,
     buttons: [{ label: 'Abbrechen', cls: 'ghost' }, { label: 'Anlegen', cls: 'primary', onClick: (close, root) => {
       const formation = root.querySelector('#f').value;
       const play = {
-        id: uid('play'), name: root.querySelector('#n').value.trim() || 'Neuer Spielzug',
+        id: uid('play'), teamId: currentTeamId(), name: root.querySelector('#n').value.trim() || 'Neuer Spielzug',
         formation, offense: formationPlayers(formation), offensePersonnelId: root.querySelector('#op').value || null,
         concept: root.querySelector('#c').value, defensePreset: 'auto', defensePersonnelId: null, defenseLocked: false,
         defense: [], duration: 4, notes: '',
@@ -325,13 +326,13 @@ function renderEditor(root, id) {
 
   function drawPanels() {
     const s = db();
-    const offP = s.personnel.filter(p => p.side === 'offense');
+    const offP = scoped('personnel').filter(p => p.side === 'offense');
     $('#opSel').innerHTML = options(offP.map(p => ({ value: p.id, label: p.name })), play.offensePersonnelId, { empty: '– ohne –' });
     const op = play.offensePersonnelId ? get('personnel', play.offensePersonnelId) : null;
     const fPers = FORMATIONS[play.formation]?.personnel;
     $('#opHint').innerHTML = !offP.length ? 'Lege unter <a href="#/personnel">Personnel</a> eine Offense-Gruppe an, um echte Spieler und ihre gemessene Geschwindigkeit zu verwenden.'
       : op && op.preset !== fPers ? `Hinweis: Formation ist für ${fPers} Personnel gedacht, gewählt ist ${op.preset}. Positionen werden bestmöglich zugeordnet.` : '';
-    const defP = s.personnel.filter(p => p.side === 'defense');
+    const defP = scoped('personnel').filter(p => p.side === 'defense');
     $('#dpSel').innerHTML = options([
       { value: 'auto', label: 'Automatisch (nach Formation)' },
       ...Object.entries(DEFENSE_PERSONNEL).map(([k, v]) => ({ value: 'preset:' + k, label: v.label.split(' (')[0] })),

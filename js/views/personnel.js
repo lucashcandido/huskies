@@ -2,11 +2,13 @@ import { db, upsert, remove, uid, get } from '../store.js';
 import { fullName, metricValue, fmtMetric } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
 import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js';
+import { scoped, currentTeamId } from '../team.js';
 
 export function render(root, params) {
   if (params[0]) return renderDetail(root, params[0]);
   const s = db();
-  const group = side => s.personnel.filter(p => p.side === side);
+  const all = scoped('personnel');
+  const group = side => all.filter(p => p.side === side);
   const card = p => {
     const filled = p.slots.filter(x => x.athleteId).length;
     const roster = p.rosterId ? get('rosters', p.rosterId) : null;
@@ -22,7 +24,7 @@ export function render(root, params) {
       <div><h1>Personnel</h1><p class="muted">Personnel-Gruppen mit konkreten Spielern speichern – z. B. „11 Personnel Base“ oder „Nickel vs Spread“. Im Playbook lassen sie sich auf Formationen legen.</p></div>
       <div class="spacer"></div><button class="primary" id="add">+ Personnel</button>
     </div>
-    ${!s.personnel.length ? '<div class="empty">Noch keine Personnel-Gruppe gespeichert.</div>' : ''}
+    ${!all.length ? '<div class="empty">Noch keine Personnel-Gruppe gespeichert.</div>' : ''}
     ${group('offense').length ? `<div class="section-title">Offense</div><div class="cards">${group('offense').map(card).join('')}</div>` : ''}
     ${group('defense').length ? `<div class="section-title">Defense</div><div class="cards">${group('defense').map(card).join('')}</div>` : ''}`;
   root.querySelectorAll('[data-id]').forEach(c => c.onclick = () => location.hash = `#/personnel/${c.dataset.id}`);
@@ -42,7 +44,7 @@ function createPersonnel() {
       <div class="field full"><label>Name</label><input id="n" placeholder="z. B. 11 Personnel – Starter"></div>
       <div class="field"><label>Seite</label><select id="side"><option value="offense">Offense</option><option value="defense">Defense</option></select></div>
       <div class="field"><label>Gruppierung</label><select id="preset"></select></div>
-      <div class="field full"><label>Roster (Spielerauswahl)</label><select id="ros">${options(s.rosters.map(r => ({ value: r.id, label: r.name })), s.rosters[0]?.id, { empty: 'Alle Athlet:innen' })}</select></div>
+      <div class="field full"><label>Roster (Spielerauswahl)</label><select id="ros">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), scoped('rosters')[0]?.id, { empty: 'Alle Athlet:innen' })}</select></div>
       <label class="full" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt)"><input type="checkbox" id="auto" checked style="width:auto"> Automatisch nach Depth Chart besetzen</label>
     </div>`,
     onOpen(root) {
@@ -57,7 +59,7 @@ function createPersonnel() {
       const side = root.querySelector('#side').value, preset = root.querySelector('#preset').value;
       const src = side === 'offense' ? OFFENSE_PERSONNEL : DEFENSE_PERSONNEL;
       const p = {
-        id: uid('per'), side, preset,
+        id: uid('per'), teamId: currentTeamId(), side, preset,
         name: root.querySelector('#n').value.trim() || src[preset].label.split(' (')[0],
         rosterId: root.querySelector('#ros').value || null,
         slots: src[preset].slots.map(sl => ({ ...sl, athleteId: null })),
@@ -81,7 +83,7 @@ function candidates(p, pos) {
         .sort((x, y) => ((x.pos === pos ? 0 : 1) - (y.pos === pos ? 0 : 1)) || (x.depth - y.depth));
     }
   }
-  return s.athletes.map(a => ({ a, pos: a.position, depth: 99 }))
+  return scoped('athletes').map(a => ({ a, pos: a.position, depth: 99 }))
     .sort((x, y) => ((x.pos === pos ? 0 : 1) - (y.pos === pos ? 0 : 1)) || (x.a.lastName || '').localeCompare(y.a.lastName || ''));
 }
 
@@ -104,7 +106,7 @@ function renderDetail(root, id) {
       <h1><input id="name" value="${esc(p.name)}" style="font-size:20px;font-weight:800;background:transparent;border-color:transparent;padding:2px 4px;margin-left:-4px"></h1>
       <p class="muted"><span class="badge ${p.side === 'offense' ? 'off' : 'def'}">${p.side === 'offense' ? 'Offense' : 'Defense'}</span> ${esc(presetLabel(p))}</p></div>
       <div class="spacer"></div>
-      <div class="field"><label>Roster</label><select id="ros">${options(s.rosters.map(r => ({ value: r.id, label: r.name })), p.rosterId, { empty: 'Alle Athlet:innen' })}</select></div>
+      <div class="field"><label>Roster</label><select id="ros">${options(scoped('rosters').map(r => ({ value: r.id, label: r.name })), p.rosterId, { empty: 'Alle Athlet:innen' })}</select></div>
       <button id="auto">Nach Depth Chart füllen</button>
       <button id="dup">Duplizieren</button>
       <button class="danger" id="del">Löschen</button>

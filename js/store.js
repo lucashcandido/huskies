@@ -14,20 +14,13 @@
 const KEY = 'huskies.v1';
 const DIRTY_KEY = 'huskies.dirty';
 const VERSION = 2;
-export const COLLS = ['athletes', 'rosters', 'personnel', 'plays'];
+export const COLLS = ['teams', 'athletes', 'rosters', 'personnel', 'plays'];
 const NESTED = { athletes: 'measurements' };            // Unterlisten, die einzeln zusammengeführt werden
 const META = new Set(['_ts', '_mdel', 'updatedAt']);
 
 const emptyDeleted = () => Object.fromEntries(COLLS.map(c => [c, {}]));
-const empty = () => ({ version: VERSION, athletes: [], rosters: [], personnel: [], plays: [], _deleted: emptyDeleted() });
+const empty = () => ({ version: VERSION, teams: [], athletes: [], rosters: [], personnel: [], plays: [], _deleted: emptyDeleted() });
 
-let state = load();
-let shadow = {};
-let dirty = loadDirty();
-const listeners = new Set();
-resetShadow();
-// Daten aus Version 1 (ohne Zeitstempel) einmalig stempeln
-if (state.version < VERSION) { state.version = VERSION; stampAll(true); saveLocal(); }
 
 function load() {
   try {
@@ -114,6 +107,15 @@ function saveLocal() {
     localStorage.setItem(DIRTY_KEY, JSON.stringify([...dirty]));
   } catch (e) { alert('Speichern fehlgeschlagen (Speicher voll?): ' + e.message); }
 }
+
+// ---------- Start (nach allen Hilfsfunktionen, die hier schon gebraucht werden) ----------
+let state = load();
+let shadow = {};
+let dirty = loadDirty();
+const listeners = new Set();
+resetShadow();
+// Daten aus Version 1 (ohne Zeitstempel) einmalig stempeln
+if (state.version < VERSION) { state.version = VERSION; stampAll(true); saveLocal(); }
 
 export function db() { return state; }
 

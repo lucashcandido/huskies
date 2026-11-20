@@ -110,6 +110,13 @@ td input{width:74px;padding:5px 7px;text-align:right}
 .pill.ok i{background:var(--green)}.pill.wait i{background:var(--yellow);animation:blink 1s infinite}.pill.err i{background:var(--red)}
 .pill.err{color:#ffb3a7;border-color:#5a2b2b}
 @keyframes blink{50%{opacity:.3}}
+/* Team */
+.team-chip{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:800;letter-spacing:.5px;border-radius:999px;padding:6px 14px}
+.team-chip:hover{background:#6eb0f0}
+.team-list{display:grid;gap:10px;margin:14px 0}
+.team-btn{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;font-size:18px;font-weight:800;text-align:left;border-radius:12px}
+.team-btn small{font-size:12px;font-weight:500;color:var(--muted)}
+.team-btn.cur{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(90,160,230,.35)}
 /* Einrichtung */
 .setup{max-width:460px;margin:30px auto}
 .setup .card{padding:22px}
