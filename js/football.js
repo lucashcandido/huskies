@@ -215,6 +215,74 @@ export function runPoints(name, dir, p) {
   return def.map(([dx, dy]) => ({ x: clamp(p.x + dx * s, 0.5, W - 0.5), y: p.y + dy }));
 }
 
+// ---------- Run Blocking ----------
+// Blocks werden in Spielbuch-Notation gezeichnet: Linie in Blockrichtung mit Querbalken am Ende.
+export const BLOCK_TYPES = {
+  trap: 'Pull (Trap)', drive: 'Drive (gerade)', zone: 'Zone Step', reach: 'Reach', down: 'Down / Angle', pull: 'Pull (Lead)',
+  kick: 'Pull (Kick-out)', climb: 'Climb (2nd Level)', hinge: 'Hinge', pass: 'Pass Pro',
+};
+const OL_ORDER = ['LT', 'LG', 'C', 'RG', 'RT'];
+/** Blocker an der Linie: OL + Tight Ends an der Line (inline) */
+export const isLineBlocker = p => p.pos === 'OL' || (p.pos === 'TE' && Math.abs(p.x - CX) < 9 && p.y > -3);
+
+/** Punkte eines Blocks; s = +1 Playside rechts, -1 links */
+export function blockPoints(type, s, p, offense) {
+  const ol = OL_ORDER.map(r => offense.find(o => o.role === r)).filter(Boolean);
+  const psT = s > 0 ? ol[ol.length - 1] : ol[0], psG = s > 0 ? ol[ol.length - 2] : ol[1];
+  const c = offense.find(o => o.role === 'C') || p;
+  const hole = psT && psG ? (psT.x + psG.x) / 2 : p.x + 4 * s;
+  const P = (x, y) => ({ x: clamp(x, 0.5, W - 0.5), y });
+  switch (type) {
+    case 'zone':  return [P(p.x + 1.9 * s, p.y + 2.3)];
+    case 'reach': return [P(p.x + 2.9 * s, p.y + 1.4)];
+    case 'down':  return [P(p.x - 1.9 * s, p.y + 2.3)];
+    case 'climb': return [P(p.x + 0.7 * s, p.y + 1.8), P(p.x + 1.0 * s, p.y + 5)];
+    case 'hinge': return [P(p.x - 1.5 * s, p.y - 1.4)];
+    case 'pass':  return [P(p.x, p.y - 1.9)];
+    case 'pull':  return [P(p.x, p.y - 1.2), P(hole, p.y - 1.2), P(hole, p.y + 2.8)];
+    case 'kick':  return [P(p.x, p.y - 1.2), P((psT?.x ?? p.x) + 2.5 * s, p.y - 1.2), P((psT?.x ?? p.x) + 3.2 * s, p.y + 0.6)];
+    case 'trap':  return [P(p.x, p.y - 1.0), P(c.x + 2.6 * s, p.y - 1.0), P(c.x + 3.0 * s, p.y + 1.2)];
+    default:      return [P(p.x, p.y + 2.8)];                     // drive
+  }
+}
+
+/** Setzt das Blocking-Schema eines Laufspielzugs für OL + Inline-TE */
+export function autoBlocks(offense, run, dir) {
+  const s = dir === 'Lt' ? -1 : 1;
+  const line = offense.filter(isLineBlocker).sort((a, b) => (a.x - b.x) * s);   // Backside → Playside
+  const ol = line.filter(p => p.pos === 'OL');
+  const bsG = ol[1], bsT = ol[0];
+  const set = (p, type) => { if (p) p.block = { type, dir, pts: blockPoints(type, s, p, offense) }; };
+  for (const p of line) {
+    let t = 'drive';
+    if (run === 'Inside Zone') t = 'zone';
+    else if (run === 'Outside Zone' || run === 'Sweep / Toss') t = 'reach';
+    else if (run === 'Draw') t = 'pass';
+    else if (run === 'Power' || run === 'Counter') t = (p === bsG || line.indexOf(p) <= line.indexOf(bsT)) ? 'hinge' : 'down';
+    else if (run === 'Trap') t = p.role === 'C' ? 'down' : ((p.x - CX) * s > 0 && p.pos === 'OL' && ol.indexOf(p) === 3) ? 'climb' : 'down';
+    set(p, t);
+  }
+  if (run === 'Power') set(bsG, 'pull');
+  if (run === 'Counter') { set(bsG, 'kick'); set(bsT, 'pull'); }
+  if (run === 'Trap') set(bsG, 'trap');
+  return offense;
+}
+
+/** Laufweg + Blocking eines Run-Spielzugs nach Formationswechsel neu setzen */
+export function applyRunScheme(offense, scheme) {
+  if (!scheme) return offense;
+  const name = `${scheme.run} ${scheme.dir}`;
+  const bc = offense.find(p => p.routeName === name) || offense.find(p => p.role === 'RB');
+  if (bc) { bc.route = runPoints(scheme.run, scheme.dir, bc); bc.routeName = name; }
+  return autoBlocks(offense, scheme.run, scheme.dir);
+}
+
+/** Block eines Spielers neu berechnen (z. B. nach Verschieben) */
+export function refreshBlock(p, offense) {
+  if (!p.block) return;
+  p.block.pts = blockPoints(p.block.type, p.block.dir === 'Lt' ? -1 : 1, p, offense);
+}
+
 /** Wandelt eine Routen-Vorlage in absolute Punkte für einen Spieler um */
 export function routePoints(name, p) {
   const def = ROUTES[name];

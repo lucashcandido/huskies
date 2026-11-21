@@ -2,12 +2,12 @@
 // Ansicht „Aufstellung“: Basis-Offense und -Defense, unter jeder Position die
 // Spieler in Depth-Reihenfolge – per Drag & Drop verschiebbar.
 
-import { get, persist, upsert } from '../store.js?v=202611211124';
-import { METRICS, METRIC, POSITIONS, fullName, ageOf, metricValue, fmtMetric, fmt } from '../metrics.js?v=202611211124';
-import { esc, toast, confirmDialog, options } from '../ui.js?v=202611211124';
-import { openAthlete } from './athletes.js?v=202611211124';
-import { scoped, currentTeam } from '../team.js?v=202611211124';
-import { OFFENSE_SLOTS, DEFENSE_SLOTS, EXTRA_SLOTS, ALL_SLOTS, SLOT, lineup, slotOf } from '../lineup.js?v=202611211124';
+import { get, persist, upsert } from '../store.js?v=202611211159';
+import { METRICS, METRIC, POSITIONS, fullName, ageOf, metricValue, fmtMetric, fmt } from '../metrics.js?v=202611211159';
+import { esc, toast, confirmDialog, options } from '../ui.js?v=202611211159';
+import { openAthlete } from './athletes.js?v=202611211159';
+import { scoped, currentTeam } from '../team.js?v=202611211159';
+import { OFFENSE_SLOTS, DEFENSE_SLOTS, EXTRA_SLOTS, ALL_SLOTS, SLOT, lineup, slotOf } from '../lineup.js?v=202611211159';
 
 const KEY_METRICS = ['forty', 'shuffle', 'maxVelocity', 'vertical', 'broad', 'bench', 'weight'];
 const view = { tab: 'lineup' };

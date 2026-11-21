@@ -1,10 +1,10 @@
 // Eigene Formationen: werden im Personnel angelegt und stehen danach im Playbook
 // neben den Standard-Formationen zur Auswahl (Schlüssel 'cf_<id>').
 
-import { db, upsert, remove, uid, persist } from './store.js?v=202611211124';
-import { FORMATIONS, CX, isEligible, OFFENSE_PERSONNEL, formationPlayers, relRoutes, offenseInFormation, personnelOf } from './football.js?v=202611211124';
-import { buildDefense } from './defense.js?v=202611211124';
-import { scoped, currentTeamId } from './team.js?v=202611211124';
+import { db, upsert, remove, uid, persist } from './store.js?v=202611211159';
+import { FORMATIONS, CX, isEligible, OFFENSE_PERSONNEL, formationPlayers, relRoutes, offenseInFormation, personnelOf, applyRunScheme } from './football.js?v=202611211159';
+import { buildDefense } from './defense.js?v=202611211159';
+import { scoped, currentTeamId } from './team.js?v=202611211159';
 
 export const keyOf = f => 'cf_' + f.id;
 
@@ -47,6 +47,7 @@ export function saveFormation(f) {
   for (const p of scoped('plays').filter(x => x.formation === key)) {
     const rel = relRoutes(p.offense, personnelOf(key));
     p.offense = offenseInFormation(key, rel).players;
+    if (p.playType === 'run' && p.runScheme) applyRunScheme(p.offense, p.runScheme);
     if (!p.defenseLocked) p.defense = buildDefense(p.offense, p.concept, 'auto').players;
     n++;
   }

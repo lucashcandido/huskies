@@ -2,8 +2,8 @@
 // Alle erzeugten Einträge tragen demo: true und lassen sich über
 // „⋯ Daten → Beispieldaten entfernen“ wieder vollständig löschen.
 
-import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, OFFENSE_CONCEPTS, applyConcept, offenseInFormation, ROUTES, runPoints } from './football.js?v=202611211124';
-import { buildDefense } from './defense.js?v=202611211124';
+import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, OFFENSE_CONCEPTS, applyConcept, offenseInFormation, ROUTES, runPoints, autoBlocks } from './football.js?v=202611211159';
+import { buildDefense } from './defense.js?v=202611211159';
 
 const FIRST = ['Lukas', 'Jonas', 'Ben', 'Elias', 'Noah', 'Paul', 'Leon', 'Finn', 'Luis', 'Felix', 'Henry', 'Emil', 'Anton', 'Theo', 'Mats', 'Jakob',
   'Moritz', 'David', 'Samuel', 'Malik', 'Niklas', 'Tim', 'Ole', 'Karim', 'Milan', 'Jannik', 'Linus', 'Tom', 'Erik', 'Yusuf', 'Hannes', 'Kofi',
@@ -166,11 +166,12 @@ export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 
     const offense = formationPlayers(formation);
     const rb = offense.find(p => p.role === 'RB');
     if (rb) { rb.route = runPoints(run, dir, rb); rb.routeName = `${run} ${dir}`; }
+    autoBlocks(offense, run, dir);
     const fb = offense.find(p => p.role === 'FB');
     if (fb && run !== 'Sweep / Toss') { fb.route = runPoints('Iso', dir, fb).slice(0, 1); fb.routeName = 'Lead'; }
     const concept = ['cover3', 'cover1', 'cover2'][(run.length + dir.length) % 3];
     return {
-      id: uid('play'), teamId: team.id, demo: true, side: 'offense', playType: 'run', name: `${CALL_NAME[formation]} ${run} ${dir}`, formation, offense,
+      id: uid('play'), teamId: team.id, demo: true, side: 'offense', playType: 'run', runScheme: { run, dir }, name: `${CALL_NAME[formation]} ${run} ${dir}`, formation, offense,
       offensePersonnelId: off11.id, concept, defensePreset: 'auto', defensePersonnelId: defNickel.id, defenseLocked: false,
       defense: buildDefense(offense, concept, 'auto').players, duration: 4, notes: 'Beispiel-Spielzug',
     };

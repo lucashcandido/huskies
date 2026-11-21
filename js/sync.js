@@ -12,7 +12,7 @@
 //   mit sha zurückschreiben; bei Konflikt (409/422) neu laden und wiederholen.
 //   Offline-Änderungen bleiben „dirty“ und werden nachgereicht.
 
-import { COLLS, fileFor, mergeRemote, sameAsRemote, dirtyColls, markClean, markAllDirty, notifyRemote } from './store.js?v=202611211124';
+import { COLLS, fileFor, mergeRemote, sameAsRemote, dirtyColls, markClean, markAllDirty, notifyRemote } from './store.js?v=202611211159';
 
 const API = 'https://api.github.com';
 const CFG_KEY = 'huskies.sync';
@@ -175,12 +175,14 @@ async function loadFile(coll, useEtag) {
   return { sha: j.sha, data: text ? JSON.parse(text) : { items: [], deleted: {} } };
 }
 
+/** Lädt, führt zusammen, schreibt. Rückgabe: true, wenn dabei Änderungen anderer Coaches übernommen wurden */
 async function saveFile(coll) {
+  let gotRemote = false;
   for (let tries = 0; tries < 4; tries++) {
     const cur = await loadFile(coll, false);
     if (!cur.unchanged) {
-      mergeRemote(coll, cur.data);
-      if (cur.sha && sameAsRemote(coll, cur.data)) return;   // nichts Neues → kein Commit
+      if (mergeRemote(coll, cur.data)) gotRemote = true;
+      if (cur.sha && sameAsRemote(coll, cur.data)) return gotRemote;   // nichts Neues → kein Commit
     }
     const body = {
       message: `${cfg.coach}: ${coll} ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
@@ -192,7 +194,7 @@ async function saveFile(coll) {
       const j = await r.json();
       etags[coll] = { etag: null, sha: j.content?.sha };    // ETag erst beim nächsten Laden neu setzen
       writeJSON(ETAG_KEY, etags);
-      return;
+      return gotRemote;
     }
     if (r.status !== 409 && r.status !== 422) throw new Error('http ' + r.status);
   }
@@ -209,14 +211,14 @@ export async function syncNow() {
     const dirty = new Set(dirtyColls());
     for (const coll of COLLS) {
       if (dirty.has(coll)) {
-        await saveFile(coll);            // lädt vorher und führt zusammen
+        // lädt vorher und führt zusammen; neu zeichnen nur, wenn Änderungen anderer Coaches dabei waren
+        if (await saveFile(coll)) changed = true;
         markClean(coll);
-        changed = true;
       } else {
         const cur = await loadFile(coll, true);
         if (!cur.unchanged && mergeRemote(coll, cur.data)) changed = true;
         // Lokal neuer als die Datei? (z. B. Daten von vor dem Verbinden) → hochladen
-        if (dirtyColls().includes(coll)) { await saveFile(coll); markClean(coll); }
+        if (dirtyColls().includes(coll)) { if (await saveFile(coll)) changed = true; markClean(coll); }
       }
     }
     status.at = Date.now();

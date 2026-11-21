@@ -1,11 +1,11 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211124';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211124';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211124';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211124';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211124';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211124';
-import { scoped, currentTeamId } from '../team.js?v=202611211124';
-import { depthOrder } from './rosters.js?v=202611211124';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211159';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211159';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211159';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211159';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211159';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211159';
+import { scoped, currentTeamId } from '../team.js?v=202611211159';
+import { depthOrder } from './rosters.js?v=202611211159';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
@@ -71,7 +71,7 @@ export function render(root, params) {
       `<button data-t="${t}" class="${listView.type === t ? 'on' : ''}">${l} <span class="muted">(${typeCount(t)})</span></button>`).join('')}</div>` : ''}
     </div>
     ${plays.length ? `<div class="cards">${plays.map(p => `<div class="card click" data-id="${p.id}" style="padding:0;overflow:hidden">
-      <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, null, false) : p)}</svg>
+      <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + blocksSVG(v.offense) + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, null, false) : p)}</svg>
       <div style="padding:10px 12px"><h3>${esc(p.name)}</h3>
       <div class="small muted">${off
         ? `<span class="badge ${typeOf(p) === 'run' ? 'def' : 'off'}">${typeOf(p) === 'run' ? 'Run' : 'Pass'}</span> ${listView.pers === 'all' ? `<span class="badge">${persLabel(personnelOf(p.formation))}</span> ` : ''}${esc(FORMATIONS[p.formation]?.label || '')}`
@@ -173,6 +173,24 @@ export function routesSVG(offense, { selId, faint } = {}) {
     return `<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="${p.id === selId ? 0.42 : 0.3}" stroke-linejoin="round" stroke-linecap="round"
       marker-end="url(#arr-${ROLE_COLOR[p.role] ? p.role : 'X'})" opacity="${faint ? 0.35 : 1}"/>`;
   }).join('');
+}
+
+/** Run Blocking in Spielbuch-Notation: Linie in Blockrichtung mit Querbalken */
+export function blocksSVG(offense, { faint, selId } = {}) {
+  let out = '';
+  for (const p of offense) {
+    const b = p.block;
+    if (!b?.pts?.length || (p.route || []).length) continue;
+    const pts = [{ x: p.x, y: p.y }, ...b.pts];
+    const a = pts[pts.length - 2], z = pts[pts.length - 1];
+    let dx = z.x - a.x, dy = z.y - a.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const bar = 0.75, nx = -dy * bar, ny = dx * bar;
+    const pull = ['pull', 'kick', 'trap'].includes(b.type);
+    const col = pull ? '#fde68a' : '#e5e7eb', w = p.id === selId ? 0.34 : 0.24;
+    out += `<g opacity="${faint ? 0.35 : 0.95}"><polyline points="${pts.map(q => `${f2(q.x)},${f2(-q.y)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>
+      <line x1="${f2(z.x + nx)}" y1="${f2(-(z.y + ny))}" x2="${f2(z.x - nx)}" y2="${f2(-(z.y - ny))}" stroke="${col}" stroke-width="${w + 0.06}" stroke-linecap="round"/></g>`;
+  }
+  return out;
 }
 
 export function playersSVG(play, { pos, sel, names, sepNow, invert } = {}) {
@@ -350,7 +368,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     if (inSim) {
       const i = clamp(Math.round(ed.t / DT), 0, ed.sim.frames.length - 1);
       const fr = ed.sim.frames[i];
-      content += routesSVG(V.offense, { faint: true });
+      content += blocksSVG(V.offense, { faint: true }) + routesSVG(V.offense, { faint: true });
       // Spuren
       for (const p of V.offense.filter(p => isEligible(p) && p.route?.length)) {
         const pts = ed.sim.frames.slice(0, i + 1).filter((_, k) => k % 2 === 0).map(f => `${f2(f.o[p.id].x)},${f2(-f.o[p.id].y)}`).join(' ');
@@ -364,7 +382,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       content += playersSVG(V, { pos: fr, sel: ed.sel, names: M.names, sepNow, invert: isDef });
     } else {
       content += assignmentsSVG(V, { sel: ed.sel, showZones: ed.showZones });
-      content += routesSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
+      content += blocksSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null }) + routesSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
       content += playersSVG(V, { sel: ed.sel, names: M.names });
       // Griffe für Routenpunkte
       if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
@@ -403,6 +421,15 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       const p = V.offense.find(x => x.id === ed.sel.id);
       if (!p) { ed.sel = null; return drawSide(); }
       const a = M.oa[p.role], sp = (a && athleteSpeedYps(a)) || defaultSpeed(p.pos);
+      const showBlock = editable() && !isDef && typeOf(play) === 'run' && isLineBlocker(p);
+      const bdir = p.block?.dir || play.runScheme?.dir || 'Rt';
+      const blockPanel = showBlock ? `
+        <div class="field"><label>Block ${p.block ? '· ' + esc(BLOCK_TYPES[p.block.type] || p.block.type) : ''}</label></div>
+        <div class="row" style="margin:6px 0"><div class="seg" id="bdirSeg"><button data-d="Lt" class="${bdir === 'Lt' ? 'on' : ''}">◀ Lt</button><button data-d="Rt" class="${bdir === 'Rt' ? 'on' : ''}">Rt ▶</button></div>
+          <span class="small muted">Playside</span></div>
+        <div class="btn-grid" style="margin-bottom:8px">${Object.entries(BLOCK_TYPES).map(([k, l]) => `<button class="sm ${p.block?.type === k ? 'on' : ''}" data-block="${k}">${esc(l)}</button>`).join('')}
+          <button class="sm danger" data-block="">Kein Block</button></div>
+        ${play.runScheme ? `<button class="sm" id="resetBlocks" style="margin-bottom:10px">Ganze Line nach Schema (${esc(play.runScheme.run)} ${esc(play.runScheme.dir)})</button>` : ''}` : '';
       card.innerHTML = `<h3>Offense · ${esc(p.role)}</h3>
         <div style="margin-bottom:8px"><b>${a ? esc(fullName(a)) : esc(p.pos)}</b>
         <div class="small muted">Topspeed ${(sp / 1.09361 * 3.6).toFixed(1).replace('.', ',')} km/h ${a ? '(gemessen)' : '(Standardwert)'}</div></div>
@@ -416,9 +443,26 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
             <button class="sm ${ed.mode === 'draw' ? 'on' : ''}" id="drawBtn">✎ Freihand zeichnen</button>
             <button class="sm" id="undoPt" ${p.route?.length ? '' : 'disabled'}>Letzten Punkt weg</button>
             <button class="sm danger" id="clearRoute" ${p.route?.length ? '' : 'disabled'}>Route löschen</button>
-          </div>` : '<p class="small muted" style="margin:0">Keine Route möglich (nicht passberechtigt).</p>'}`;
+          </div>` : (showBlock ? '' : '<p class="small muted" style="margin:0">Keine Route möglich (nicht passberechtigt).</p>')}`;
+      if (showBlock) card.querySelector('h3').nextElementSibling.insertAdjacentHTML('afterend', blockPanel);
+      let curDir = bdir;
+      card.querySelectorAll('#bdirSeg button').forEach(b => b.onclick = () => {
+        curDir = b.dataset.d;
+        card.querySelectorAll('#bdirSeg button').forEach(x => x.classList.toggle('on', x === b));
+        if (p.block) { p.block.dir = curDir; refreshBlock(p, play.offense); commit(); }
+      });
+      card.querySelectorAll('[data-block]').forEach(b => b.onclick = () => {
+        const t = b.dataset.block;
+        if (!t) delete p.block;
+        else p.block = { type: t, dir: curDir, pts: blockPoints(t, curDir === 'Lt' ? -1 : 1, p, play.offense) };
+        commit();
+      });
+      card.querySelector('#resetBlocks')?.addEventListener('click', () => { autoBlocks(play.offense, play.runScheme.run, play.runScheme.dir); commit(); toast('Blocking zurückgesetzt'); });
       card.querySelectorAll('[data-run]').forEach(b => b.onclick = () => {
-        p.route = runPoints(b.dataset.run, b.dataset.dir, p); p.routeName = `${b.dataset.run} ${b.dataset.dir}`; commit();
+        p.route = runPoints(b.dataset.run, b.dataset.dir, p); p.routeName = `${b.dataset.run} ${b.dataset.dir}`;
+        play.runScheme = { run: b.dataset.run, dir: b.dataset.dir };
+        autoBlocks(play.offense, b.dataset.run, b.dataset.dir);
+        commit(); toast(`Blocking für ${b.dataset.run} ${b.dataset.dir} gesetzt`);
       });
       card.querySelectorAll('[data-route]').forEach(b => b.onclick = () => {
         p.route = routePoints(b.dataset.route, p); p.routeName = b.dataset.route; commit();
@@ -598,6 +642,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     const d = ed.drag; ed.drag = null;
     if (!d.moved) return;
     if (d.kind === 'player' && d.side === 'd') play.defenseLocked = true;
+    if (d.kind === 'player' && d.side === 'o') play.offense.forEach(p => refreshBlock(p, play.offense));
     if (d.kind === 'pt') { const p = play.offense.find(x => x.id === ed.sel.id); p.routeName = 'Freie Route'; }
     commit({ realign: d.kind === 'player' && d.side === 'o' });
   };
@@ -642,6 +687,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       // Routen wandern mit: dieselben Rollen laufen in der neuen Formation dieselben Routen
       const rel = relRoutes(play.offense, personnelOf(play.formation));
       play.formation = e.target.value; play.offense = offenseInFormation(play.formation, rel).players;
+      if (typeOf(play) === 'run' && play.runScheme) applyRunScheme(play.offense, play.runScheme);
       if (isDef && play.opponentConcept) applyConcept(play.offense, play.opponentConcept);
       const before = ed.pers;
       ed.sel = null; play.defenseLocked = false; ed.pers = basePers(); commit({ realign: true });
