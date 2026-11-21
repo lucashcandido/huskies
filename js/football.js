@@ -166,7 +166,12 @@ export function relRoutes(offense, pers) {
 
 /** Erzeugt die Offense eines Konzepts in einem anderen Personnel */
 export function offenseIn(pers, family, rel) {
-  const formation = FORM_BY[pers]?.[family] || FORM_BY['11'][family];
+  return offenseInFormation(FORM_BY[pers]?.[family] || FORM_BY['11'][family], rel);
+}
+
+/** Überträgt Routen (je 11-Rolle, relativ) auf eine beliebige Formation */
+export function offenseInFormation(formation, rel) {
+  const pers = personnelOf(formation);
   const players = formationPlayers(formation);
   for (const [canon, r] of Object.entries(rel)) {
     const role = ROLE_MAP[pers]?.[canon] || canon;

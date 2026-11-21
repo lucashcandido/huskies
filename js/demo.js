@@ -2,7 +2,7 @@
 // Alle erzeugten Einträge tragen demo: true und lassen sich über
 // „⋯ Daten → Beispieldaten entfernen“ wieder vollständig löschen.
 
-import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, routePoints, OFFENSE_CONCEPTS, applyConcept } from './football.js';
+import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, OFFENSE_CONCEPTS, applyConcept, offenseInFormation, ROUTES } from './football.js';
 import { buildDefense } from './defense.js';
 
 const FIRST = ['Lukas', 'Jonas', 'Ben', 'Elias', 'Noah', 'Paul', 'Leon', 'Finn', 'Luis', 'Felix', 'Henry', 'Emil', 'Anton', 'Theo', 'Mats', 'Jakob',
@@ -50,13 +50,17 @@ export function levelFor(name) {
 }
 
 const DATES = ['2026-03-14', '2026-06-20', '2026-09-26'];
-const PLAYS = [
-  ['Smash vs Cover 2', 'doubles', 'cover2', { X: 'Hitch', H: 'Corner', Y: 'Corner', Z: 'Hitch', RB: 'Flat' }],
-  ['Four Verts vs Cover 3', 'doubles', 'cover3', { X: 'Go / Fade', H: 'Seam', Y: 'Seam', Z: 'Go / Fade', RB: 'Swing' }],
-  ['Mesh vs Cover 1', 'trips', 'cover1', { X: 'Drag', Y: 'Drag', H: 'Corner', Z: 'Go / Fade', RB: 'Angle' }],
-  ['Flood vs Cover 3', 'trips', 'cover3', { X: 'Post', Y: 'Flat', H: 'Out', Z: 'Go / Fade', RB: 'Swing' }],
-  ['Curl/Flat vs Cover 4', 'doubles', 'cover4', { X: 'Curl', H: 'Flat', Y: 'Seam', Z: 'Curl', RB: 'Angle' }],
-];
+// Offense-Calls je Personnel: [Formation, Konzept, Defense zum Testen]. Der Name beginnt mit der Formation.
+export const CALL_NAME = { doubles: 'Doubles', spread: 'Spread', trips: 'Trips Rt', trips10: 'Trips Rt', bunch: 'Bunch Rt', empty: 'Empty',
+  ace12: 'Ace', trips12: 'Tight Trips Rt', proI: 'Pro I', jumbo22: 'Jumbo' };
+const CALLS = {
+  '10': [['spread', 'fourVerts', 'cover3'], ['spread', 'slants', 'cover1'], ['spread', 'dagger', 'cover4'], ['trips10', 'flood', 'cover3'], ['trips10', 'stick', 'cover2'], ['empty', 'mesh', 'cover1']],
+  '11': [['doubles', 'smash', 'cover2'], ['doubles', 'curlFlat', 'cover4'], ['doubles', 'fourVerts', 'cover3'], ['trips', 'flood', 'cover3'], ['trips', 'mesh', 'cover1'], ['trips', 'stick', 'cover2'], ['bunch', 'flood', 'cover1']],
+  '12': [['ace12', 'smash', 'cover2'], ['ace12', 'dagger', 'cover3'], ['trips12', 'flood', 'cover3'], ['trips12', 'stick', 'cover4']],
+  '21': [['proI', 'curlFlat', 'cover3'], ['proI', 'flood', 'cover2'], ['proI', 'smash', 'cover4']],
+  '22': [['jumbo22', 'flood', 'cover3'], ['jumbo22', 'curlFlat', 'cover1']],
+};
+const CALL_PERS = { youth: ['11'], prospect: ['11'], junior: ['11', '12', '21'], u20: ['10', '11', '12', '21', '22'], senior: ['10', '11', '12', '21', '22'] };
 
 // Defense-Beispiele: [Name, Konzept, Gegner-Konzept, zusätzliche Blitzer]
 const DEF_PLAYS = [
@@ -72,7 +76,7 @@ const DEF_PLAYS = [
  * Fiktive Daten für ein Team.
  * @param team {id, name}; opts: {level, seed, plays, uid}
  */
-export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 3, defPlays = 3, uid } = {}) {
+export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = true, defPlays = 3, uid } = {}) {
   const L = LEVELS[level] || LEVELS.u20;
   let s = (seed * 9301 + 49297) % 233280 || 7;
   const rnd = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
@@ -139,19 +143,16 @@ export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 
   if (L.mix.FB) personnel.push({ id: uid('per'), teamId: team.id, demo: true, side: 'offense', preset: '21', name: '21 Personnel – I-Form', slots: fill(OFFENSE_PERSONNEL['21'].slots), notes: '' });
   if (L.mix.LB >= 3) personnel.push({ id: uid('per'), teamId: team.id, demo: true, side: 'defense', preset: 'base43', name: 'Base 4-3', slots: fill(DEFENSE_PERSONNEL.base43.slots), notes: '' });
 
-  const playList = PLAYS.slice(0, plays).map(([name, formation, concept, routes]) => {
-    const offense = formationPlayers(formation);
-    for (const [role, rt] of Object.entries(routes)) {
-      const p = offense.find(x => x.role === role);
-      if (p) { p.route = routePoints(rt, p); p.routeName = rt; }
-    }
+  const playList = !plays ? [] : CALL_PERS[level].flatMap(pers => CALLS[pers].map(([formation, ck, concept]) => {
+    const c = OFFENSE_CONCEPTS[ck];
+    const rel = Object.fromEntries(Object.entries(c.routes).map(([role, r]) => [role, { name: r, pts: ROUTES[r] }]));
+    const offense = offenseInFormation(formation, rel).players;
     return {
-      id: uid('play'), teamId: team.id, demo: true, side: 'offense', name, formation, offense, offensePersonnelId: off11.id, concept,
-      defensePreset: 'auto', defensePersonnelId: defNickel.id, defenseLocked: false,
-      defense: buildDefense(offense, concept, 'nickel').players, duration: 4,
-      notes: 'Beispiel-Spielzug',
+      id: uid('play'), teamId: team.id, demo: true, side: 'offense', name: `${CALL_NAME[formation]} ${c.label}`, formation, offense,
+      offensePersonnelId: off11.id, concept, defensePreset: 'auto', defensePersonnelId: defNickel.id, defenseLocked: false,
+      defense: buildDefense(offense, concept, 'nickel').players, duration: 4, notes: 'Beispiel-Spielzug',
     };
-  });
+  }));
   const defNickelOrBase = personnel.find(p => p.preset === 'base43') || defNickel;
   const defList = DEF_PLAYS.slice(0, defPlays).map(([name, concept, oc, blitz]) => {
     const c = OFFENSE_CONCEPTS[oc];

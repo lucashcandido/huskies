@@ -220,3 +220,4 @@ summary{font-size:13px}
   .card,.table-wrap{border-color:#999;background:#fff}
   th{background:#eee;color:#000}
 }
+.seg button.on .muted{color:inherit;opacity:.65}

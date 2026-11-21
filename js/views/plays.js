@@ -1,7 +1,7 @@
 import { db, upsert, remove, uid, get } from '../store.js';
 import { fullName, athleteSpeedYps } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, personnelOf, familyOf, relRoutes, offenseIn } from '../football.js';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js';
 import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js';
 import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js';
 import { scoped, currentTeamId } from '../team.js';
@@ -28,36 +28,50 @@ export function viewOf(play, pers, withDefense = true) {
   return withDefense ? v : { ...v, defense: [] };
 }
 
+/** Formationen gruppiert nach Personnel (für Auswahllisten) */
+export function formationOptions(selected, onlyPers) {
+  return PERS_KEYS.filter(k => !onlyPers || k === onlyPers).map(k => {
+    const list = Object.entries(FORMATIONS).filter(([, f]) => f.personnel === k);
+    return list.length ? `<optgroup label="${k} Personnel">${options(list.map(([key, f]) => ({ value: key, label: f.label })), selected)}</optgroup>` : '';
+  }).join('');
+}
+const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'de', { numeric: true, sensitivity: 'base' });
+
 // ======================= Liste =======================
-const listView = { side: 'offense' };
+const listView = { side: 'offense', pers: '11' };
 export const sideOf = p => p.side === 'defense' ? 'defense' : 'offense';
 
 export function render(root, params) {
   if (params[0]) return renderEditor(root, params[0]);
   const all = scoped('plays');
-  const plays = all.filter(p => sideOf(p) === listView.side).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-  const count = s => all.filter(p => sideOf(p) === s).length;
   const off = listView.side === 'offense';
+  const persCount = k => all.filter(p => sideOf(p) === 'offense' && personnelOf(p.formation) === k).length;
+  // Offense: nur das gewählte Personnel; alphabetisch, damit gleiche Formationen (Anfang des Calls) beieinander stehen
+  const plays = all.filter(p => sideOf(p) === listView.side && (!off || personnelOf(p.formation) === listView.pers)).sort(byName);
+  const count = s => all.filter(p => sideOf(p) === s).length;
   root.innerHTML = `
     <div class="page-head">
       <div><h1>Playbook</h1><p class="muted">${off
-        ? 'Offense-Konzepte – in 11 Personnel dargestellt. Antippen, um das Konzept in anderem Personnel zu sehen und gegen eine Defense laufen zu lassen.'
+        ? 'Personnel wählen – die Spielzüge sind alphabetisch sortiert, so stehen gleiche Formationen beieinander. Antippen zum Bearbeiten und um sie gegen eine Defense laufen zu lassen.'
         : 'Defense: Coverage und Blitzes festlegen und gegen typische Offense-Konzepte testen.'}</p></div>
       <div class="spacer"></div><button class="primary" id="add">+ ${off ? 'Offense' : 'Defense'}-Spielzug</button>
     </div>
     <div class="toolbar"><div class="seg" id="sideTabs">
       <button data-s="offense" class="${off ? 'on' : ''}">Offense (${count('offense')})</button>
       <button data-s="defense" class="${off ? '' : 'on'}">Defense (${count('defense')})</button>
-    </div></div>
+    </div>
+    ${off ? `<div class="seg" id="persTabs">${PERS_KEYS.map(k => `<button data-p="${k}" class="${listView.pers === k ? 'on' : ''}">${k} Personnel <span class="muted">(${persCount(k)})</span></button>`).join('')}</div>` : ''}
+    </div>
     ${plays.length ? `<div class="cards">${plays.map(p => `<div class="card click" data-id="${p.id}" style="padding:0;overflow:hidden">
-      <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, '11', false) : p)}</svg>
+      <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, null, false) : p)}</svg>
       <div style="padding:10px 12px"><h3>${esc(p.name)}</h3>
       <div class="small muted">${off
-        ? `${esc(FORMATIONS[viewOf(p, '11').formation]?.label || '')} · 11 Personnel`
+        ? `${esc(FORMATIONS[p.formation]?.label || '')}`
         : `${esc(CONCEPTS[p.concept]?.label || '')} · gegen ${esc(OFFENSE_CONCEPTS[p.opponentConcept]?.label || 'Offense')} (${esc(FORMATIONS[p.formation]?.label || '')})`}</div></div>
-    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? 'Offense' : 'Defense'}-Spielzüge. Leg den ersten an!</div>`}`;
+    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? `Spielzüge in ${listView.pers} Personnel` : 'Defense-Spielzüge'}. Leg den ersten an!</div>`}`;
   root.querySelectorAll('[data-id]').forEach(c => c.onclick = () => location.hash = `#/plays/${c.dataset.id}`);
   root.querySelectorAll('#sideTabs button').forEach(b => b.onclick = () => { listView.side = b.dataset.s; render(root, []); });
+  root.querySelectorAll('#persTabs button').forEach(b => b.onclick = () => { listView.pers = b.dataset.p; render(root, []); });
   root.querySelector('#add').onclick = () => (off ? newPlay() : newDefensePlay());
 }
 
@@ -90,10 +104,10 @@ function newDefensePlay() {
 function newPlay() {
   const s = db();
   modal({
-    title: 'Neuer Offense-Spielzug', width: 520,
+    title: `Neuer Spielzug · ${listView.pers} Personnel`, width: 520,
     body: `<div class="grid">
-      <div class="field full"><label>Name</label><input id="n" placeholder="z. B. Mesh vs Cover 3"></div>
-      <div class="field full"><label>Formation</label><select id="f">${options(Object.entries(FORMATIONS).map(([k, v]) => ({ value: k, label: v.label })), 'doubles')}</select></div>
+      <div class="field full"><label>Call / Name</label><input id="n" placeholder="z. B. Trips Rt Flood – mit der Formation beginnen"></div>
+      <div class="field full"><label>Formation</label><select id="f">${formationOptions(null, listView.pers)}${`<optgroup label="Andere Personnel">${options(Object.entries(FORMATIONS).filter(([, f]) => f.personnel !== listView.pers).map(([k, v]) => ({ value: k, label: `${v.label} (${v.personnel})` })))}</optgroup>`}</select></div>
       <div class="field full"><label>Offense-Personnel</label><select id="op">${options(scoped('personnel').filter(p => p.side === 'offense').map(p => ({ value: p.id, label: p.name })), '', { empty: '– ohne (nur Positionen) –' })}</select></div>
       <div class="field full"><label>Defense-Konzept</label><select id="c">${options(Object.entries(CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), 'cover3')}</select></div>
     </div>`,
@@ -210,7 +224,8 @@ function renderEditor(root, id) {
   const ed = { sel: null, mode: 'move', showZones: false, sim: null, t: 0, playing: false, speed: 1, raf: 0, drag: null, last: 0 };
   // Ansicht: Personnel (Standard 11) und Defense ein/aus (bei Offense-Spielzügen, gemerkt pro Gerät)
   const basePers = () => personnelOf(play.formation);
-  ed.pers = '11';
+  ed.pers = basePers();
+  if (!isDef) listView.pers = ed.pers;   // zurück in der Liste landet man im Personnel dieses Spielzugs
   ed.showDef = isDef || localStorage.getItem('huskies.showDef') === '1';
   const editable = () => ed.pers === basePers();
   let V = play;
@@ -220,7 +235,7 @@ function renderEditor(root, id) {
   const OFFCARD = `
         <div class="card">
           <h3>${isDef ? 'Gegner (Offense)' : 'Offense'}</h3>
-          <div class="field"><label>Formation</label><select id="formSel">${options(Object.entries(FORMATIONS).map(([k, v]) => ({ value: k, label: v.label })), play.formation)}</select></div>
+          <div class="field"><label>Formation</label><select id="formSel">${formationOptions(play.formation)}</select></div>
           ${isDef
             ? `<div class="field" style="margin-top:8px"><label>Konzept</label><select id="ocSel">${options(Object.entries(OFFENSE_CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), play.opponentConcept, { empty: '– eigene Routen –' })}</select></div>
                <div class="small muted" style="margin-top:6px">Routen lassen sich zusätzlich von Hand ändern.</div>`
@@ -249,7 +264,7 @@ function renderEditor(root, id) {
     <div class="designer">
       <div>
         <div class="row" style="margin-bottom:8px;justify-content:space-between">
-          <div class="row" style="gap:6px"><span class="small muted">${isDef ? 'Gegner-Personnel' : 'Personnel'}</span><div class="seg" id="persSeg"></div></div>
+          <div class="row" style="gap:6px">${isDef ? '<span class="small muted">Gegner</span>' : ''}<div id="persSeg" class="row" style="gap:6px"></div></div>
           ${isDef ? '' : '<button id="defToggle"></button>'}
         </div>
         <div class="field-wrap">
@@ -458,8 +473,8 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
 
   function drawViewBar() {
     const seg = $('#persSeg');
-    seg.innerHTML = PERS_KEYS.map(k => `<button data-p="${k}" class="${ed.pers === k ? 'on' : ''}" title="${k === basePers() ? 'Basis – hier bearbeitbar' : 'Ansicht'}">${k}${k === basePers() ? ' •' : ''}</button>`).join('');
-    seg.querySelectorAll('[data-p]').forEach(b => b.onclick = () => setPers(b.dataset.p));
+    ed.pers = basePers();
+    seg.innerHTML = `<span class="badge">${basePers()} Personnel</span> <span class="small muted">${esc(FORMATIONS[play.formation]?.label || '')}</span>`;
     const t = $('#defToggle');
     if (t) { t.textContent = ed.showDef ? '🛡 Defense ausblenden' : '🛡 Defense einblenden'; t.classList.toggle('on', ed.showDef); }
   }
@@ -605,14 +620,15 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   $('#durSel').onchange = e => { play.duration = +e.target.value; $('#tSlider').max = play.duration; ed.t = 0; commit(); };
   $('#formSel').onchange = e => {
     const apply = () => {
-      play.formation = e.target.value; play.offense = formationPlayers(play.formation);
+      // Routen wandern mit: dieselben Rollen laufen in der neuen Formation dieselben Routen
+      const rel = relRoutes(play.offense, personnelOf(play.formation));
+      play.formation = e.target.value; play.offense = offenseInFormation(play.formation, rel).players;
       if (isDef && play.opponentConcept) applyConcept(play.offense, play.opponentConcept);
+      const before = ed.pers;
       ed.sel = null; play.defenseLocked = false; ed.pers = basePers(); commit({ realign: true });
+      if (!isDef && before !== ed.pers) { listView.pers = ed.pers; toast(`Steht jetzt unter ${ed.pers} Personnel`); }
     };
-    if (!isDef && play.offense.some(p => p.route?.length)) {
-      confirmDialog('Neue Formation setzt alle Spieler zurück und löscht die Routen. Fortfahren?', apply, 'Formation wechseln');
-      e.target.value = play.formation;
-    } else apply();
+    apply();
   };
   if ($('#opSel')) $('#opSel').onchange = e => { play.offensePersonnelId = e.target.value || null; commit(); };
   if ($('#ocSel')) $('#ocSel').onchange = e => {
