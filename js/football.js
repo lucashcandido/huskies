@@ -13,6 +13,7 @@ const OL = [
   { role: 'LT', pos: 'OL' }, { role: 'LG', pos: 'OL' }, { role: 'C', pos: 'OL' }, { role: 'RG', pos: 'OL' }, { role: 'RT', pos: 'OL' },
 ];
 export const OFFENSE_PERSONNEL = {
+  '00': { label: 'Empty / 00 Personnel (0 RB · 0 TE · 5 WR)', slots: [{ role: 'QB', pos: 'QB' }, { role: 'X', pos: 'WR' }, { role: 'Z', pos: 'WR' }, { role: 'H', pos: 'WR' }, { role: 'Y', pos: 'WR' }, { role: 'F', pos: 'WR' }, ...OL] },
   '10': { label: '10 Personnel (1 RB · 0 TE · 4 WR)', slots: [{ role: 'QB', pos: 'QB' }, { role: 'RB', pos: 'RB' }, { role: 'X', pos: 'WR' }, { role: 'Z', pos: 'WR' }, { role: 'H', pos: 'WR' }, { role: 'Y', pos: 'WR' }, ...OL] },
   '11': { label: '11 Personnel (1 RB · 1 TE · 3 WR)', slots: [{ role: 'QB', pos: 'QB' }, { role: 'RB', pos: 'RB' }, { role: 'X', pos: 'WR' }, { role: 'Z', pos: 'WR' }, { role: 'H', pos: 'WR' }, { role: 'Y', pos: 'TE' }, ...OL] },
   '12': { label: '12 Personnel (1 RB · 2 TE · 2 WR)', slots: [{ role: 'QB', pos: 'QB' }, { role: 'RB', pos: 'RB' }, { role: 'X', pos: 'WR' }, { role: 'Z', pos: 'WR' }, { role: 'Y', pos: 'TE' }, { role: 'U', pos: 'TE' }, ...OL] },
@@ -35,7 +36,7 @@ export const DEFENSE_PERSONNEL = {
 };
 
 export const ROLE_NAMES = {
-  QB: 'Quarterback', RB: 'Running Back', FB: 'Fullback', X: 'X – Split End', Z: 'Z – Flanker', H: 'H – Slot', Y: 'Y', U: 'U – 2. TE',
+  QB: 'Quarterback', F: 'F – 5. Receiver', RB: 'Running Back', FB: 'Fullback', X: 'X – Split End', Z: 'Z – Flanker', H: 'H – Slot', Y: 'Y', U: 'U – 2. TE',
   LT: 'Left Tackle', LG: 'Left Guard', C: 'Center', RG: 'Right Guard', RT: 'Right Tackle',
   LE: 'Left End', DLT: 'Tackle', RE: 'Right End', W: 'Will LB', M: 'Mike LB', S: 'Sam LB',
   CBL: 'Cornerback links', CBR: 'Cornerback rechts', NB: 'Nickel', DB: 'Dime', FS: 'Free Safety', SS: 'Strong Safety',
@@ -63,10 +64,18 @@ export const FORMATIONS = {
     { role: 'QB', pos: 'QB', x: CX, y: -5 }, { role: 'RB', pos: 'RB', x: CX - 2.3, y: -5 },
     { role: 'X', pos: 'WR', x: 6, y: -1 },
     { role: 'Z', pos: 'WR', x: W - 13, y: -1 }, { role: 'H', pos: 'WR', x: W - 11.5, y: -2.5 }, { role: 'Y', pos: 'TE', x: W - 14.5, y: -2.5 }] },
-  'empty': { label: 'Empty 3x2', personnel: '10', players: () => [...ol(),
+  'empty': { label: 'Empty 3x2', personnel: '00', players: () => [...ol(),
     { role: 'QB', pos: 'QB', x: CX, y: -5 },
-    { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'RB', pos: 'RB', x: 13, y: -2 },
+    { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'F', pos: 'WR', x: 13, y: -2 },
     { role: 'H', pos: 'WR', x: W - 18, y: -2 }, { role: 'Y', pos: 'WR', x: W - 12, y: -2 }, { role: 'Z', pos: 'WR', x: W - 6, y: -1 }] },
+  'emptyQuads': { label: 'Empty Quads 4x1', personnel: '00', players: () => [...ol(),
+    { role: 'QB', pos: 'QB', x: CX, y: -5 },
+    { role: 'X', pos: 'WR', x: 6, y: -1 },
+    { role: 'F', pos: 'WR', x: CX + 5, y: -2 }, { role: 'H', pos: 'WR', x: W - 18, y: -2 }, { role: 'Y', pos: 'WR', x: W - 12, y: -2 }, { role: 'Z', pos: 'WR', x: W - 6, y: -1 }] },
+  'emptySpread': { label: 'Empty 2x3 (Trey Left)', personnel: '00', players: () => [...ol(),
+    { role: 'QB', pos: 'QB', x: CX, y: -5 },
+    { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'H', pos: 'WR', x: 13, y: -2 }, { role: 'F', pos: 'WR', x: 19, y: -2 },
+    { role: 'Y', pos: 'WR', x: W - 13, y: -2 }, { role: 'Z', pos: 'WR', x: W - 6, y: -1 }] },
   'ace12': { label: 'Ace 12 (2 TE)', personnel: '12', players: () => [...ol(),
     { role: 'QB', pos: 'QB', x: CX, y: -1.8 }, { role: 'RB', pos: 'RB', x: CX, y: -7 },
     { role: 'X', pos: 'WR', x: 6, y: -1 }, { role: 'U', pos: 'TE', x: CX - 6, y: -1.5 },
@@ -143,14 +152,15 @@ export function applyConcept(players, key) {
 // ---------- Dasselbe Konzept in anderem Personnel ----------
 // Konzepte werden in „11-Rollen“ gedacht (X, Z, H, Y, RB). In anderen Personnel-Gruppen
 // übernimmt ein anderer Spieler die Rolle, die Formation passt sich an.
-export const PERS_KEYS = ['10', '11', '12', '21', '22'];
-const ROLE_MAP = { '10': {}, '11': {}, '12': { H: 'U' }, '21': { H: 'FB' }, '22': { H: 'U', Z: 'FB' } };
+export const PERS_KEYS = ['00', '10', '11', '12', '21', '22'];
+export const persLabel = k => (k === '00' ? 'Empty' : `${k} Personnel`);
+const ROLE_MAP = { '00': { RB: 'F' }, '10': {}, '11': {}, '12': { H: 'U' }, '21': { H: 'FB' }, '22': { H: 'U', Z: 'FB' } };
 const FORM_BY = {
-  '10': { doubles: 'spread', trips: 'trips10' }, '11': { doubles: 'doubles', trips: 'trips' },
+  '00': { doubles: 'emptySpread', trips: 'empty' }, '10': { doubles: 'spread', trips: 'trips10' }, '11': { doubles: 'doubles', trips: 'trips' },
   '12': { doubles: 'ace12', trips: 'trips12' }, '21': { doubles: 'proI', trips: 'proI' }, '22': { doubles: 'jumbo22', trips: 'jumbo22' },
 };
 export const personnelOf = formation => FORMATIONS[formation]?.personnel || '11';
-export const familyOf = formation => (['trips', 'bunch', 'empty', 'trips10', 'trips12'].includes(formation) ? 'trips' : 'doubles');
+export const familyOf = formation => (['trips', 'bunch', 'empty', 'emptyQuads', 'trips10', 'trips12'].includes(formation) ? 'trips' : 'doubles');
 const canonRole = (role, pers) => Object.entries(ROLE_MAP[pers] || {}).find(([, a]) => a === role)?.[0] || role;
 
 /** Routen relativ zum Startpunkt (dx Richtung Feldmitte), je 11-Rolle */

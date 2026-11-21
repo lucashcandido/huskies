@@ -52,15 +52,16 @@ export function levelFor(name) {
 const DATES = ['2026-03-14', '2026-06-20', '2026-09-26'];
 // Offense-Calls je Personnel: [Formation, Konzept, Defense zum Testen]. Der Name beginnt mit der Formation.
 export const CALL_NAME = { doubles: 'Doubles', spread: 'Spread', trips: 'Trips Rt', trips10: 'Trips Rt', bunch: 'Bunch Rt', empty: 'Empty',
-  ace12: 'Ace', trips12: 'Tight Trips Rt', proI: 'Pro I', jumbo22: 'Jumbo' };
+  emptyQuads: 'Empty Quads', emptySpread: 'Empty Trey Lt', ace12: 'Ace', trips12: 'Tight Trips Rt', proI: 'Pro I', jumbo22: 'Jumbo' };
 const CALLS = {
-  '10': [['spread', 'fourVerts', 'cover3'], ['spread', 'slants', 'cover1'], ['spread', 'dagger', 'cover4'], ['trips10', 'flood', 'cover3'], ['trips10', 'stick', 'cover2'], ['empty', 'mesh', 'cover1']],
+  '10': [['spread', 'fourVerts', 'cover3'], ['spread', 'slants', 'cover1'], ['spread', 'dagger', 'cover4'], ['trips10', 'flood', 'cover3'], ['trips10', 'stick', 'cover2']],
+  '00': [['empty', 'mesh', 'cover1'], ['empty', 'flood', 'cover3'], ['emptyQuads', 'stick', 'cover2'], ['emptySpread', 'slants', 'cover1'], ['emptySpread', 'fourVerts', 'cover4']],
   '11': [['doubles', 'smash', 'cover2'], ['doubles', 'curlFlat', 'cover4'], ['doubles', 'fourVerts', 'cover3'], ['trips', 'flood', 'cover3'], ['trips', 'mesh', 'cover1'], ['trips', 'stick', 'cover2'], ['bunch', 'flood', 'cover1']],
   '12': [['ace12', 'smash', 'cover2'], ['ace12', 'dagger', 'cover3'], ['trips12', 'flood', 'cover3'], ['trips12', 'stick', 'cover4']],
   '21': [['proI', 'curlFlat', 'cover3'], ['proI', 'flood', 'cover2'], ['proI', 'smash', 'cover4']],
   '22': [['jumbo22', 'flood', 'cover3'], ['jumbo22', 'curlFlat', 'cover1']],
 };
-const CALL_PERS = { youth: ['11'], prospect: ['11'], junior: ['11', '12', '21'], u20: ['10', '11', '12', '21', '22'], senior: ['10', '11', '12', '21', '22'] };
+const CALL_PERS = { youth: ['11'], prospect: ['11'], junior: ['11', '12', '21'], u20: ['00', '10', '11', '12', '21', '22'], senior: ['00', '10', '11', '12', '21', '22'] };
 
 // Defense-Beispiele: [Name, Konzept, Gegner-Konzept, zusätzliche Blitzer]
 const DEF_PLAYS = [

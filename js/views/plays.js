@@ -1,13 +1,13 @@
 import { db, upsert, remove, uid, get } from '../store.js';
 import { fullName, athleteSpeedYps } from '../metrics.js';
 import { esc, modal, toast, confirmDialog, options } from '../ui.js';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js';
 import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js';
 import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js';
 import { scoped, currentTeamId } from '../team.js';
 import { depthOrder } from './rosters.js';
 
-const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', RB: '#a3e635', FB: '#cbd5e1' };
+const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
 const VIEW = { x: -1, y: -32, w: W + 2, h: 44 };
 const f2 = n => (+n).toFixed(2);
@@ -32,7 +32,7 @@ export function viewOf(play, pers, withDefense = true) {
 export function formationOptions(selected, onlyPers) {
   return PERS_KEYS.filter(k => !onlyPers || k === onlyPers).map(k => {
     const list = Object.entries(FORMATIONS).filter(([, f]) => f.personnel === k);
-    return list.length ? `<optgroup label="${k} Personnel">${options(list.map(([key, f]) => ({ value: key, label: f.label })), selected)}</optgroup>` : '';
+    return list.length ? `<optgroup label="${persLabel(k)}">${options(list.map(([key, f]) => ({ value: key, label: f.label })), selected)}</optgroup>` : '';
   }).join('');
 }
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'de', { numeric: true, sensitivity: 'base' });
@@ -60,7 +60,7 @@ export function render(root, params) {
       <button data-s="offense" class="${off ? 'on' : ''}">Offense (${count('offense')})</button>
       <button data-s="defense" class="${off ? '' : 'on'}">Defense (${count('defense')})</button>
     </div>
-    ${off ? `<div class="seg" id="persTabs">${PERS_KEYS.map(k => `<button data-p="${k}" class="${listView.pers === k ? 'on' : ''}">${k} Personnel <span class="muted">(${persCount(k)})</span></button>`).join('')}</div>` : ''}
+    ${off ? `<div class="seg" id="persTabs">${PERS_KEYS.map(k => `<button data-p="${k}" class="${listView.pers === k ? 'on' : ''}">${persLabel(k)} <span class="muted">(${persCount(k)})</span></button>`).join('')}</div>` : ''}
     </div>
     ${plays.length ? `<div class="cards">${plays.map(p => `<div class="card click" data-id="${p.id}" style="padding:0;overflow:hidden">
       <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, null, false) : p)}</svg>
@@ -68,7 +68,7 @@ export function render(root, params) {
       <div class="small muted">${off
         ? `${esc(FORMATIONS[p.formation]?.label || '')}`
         : `${esc(CONCEPTS[p.concept]?.label || '')} · gegen ${esc(OFFENSE_CONCEPTS[p.opponentConcept]?.label || 'Offense')} (${esc(FORMATIONS[p.formation]?.label || '')})`}</div></div>
-    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? `Spielzüge in ${listView.pers} Personnel` : 'Defense-Spielzüge'}. Leg den ersten an!</div>`}`;
+    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? `Spielzüge in ${persLabel(listView.pers)}` : 'Defense-Spielzüge'}. Leg den ersten an!</div>`}`;
   root.querySelectorAll('[data-id]').forEach(c => c.onclick = () => location.hash = `#/plays/${c.dataset.id}`);
   root.querySelectorAll('#sideTabs button').forEach(b => b.onclick = () => { listView.side = b.dataset.s; render(root, []); });
   root.querySelectorAll('#persTabs button').forEach(b => b.onclick = () => { listView.pers = b.dataset.p; render(root, []); });
@@ -104,7 +104,7 @@ function newDefensePlay() {
 function newPlay() {
   const s = db();
   modal({
-    title: `Neuer Spielzug · ${listView.pers} Personnel`, width: 520,
+    title: `Neuer Spielzug · ${persLabel(listView.pers)}`, width: 520,
     body: `<div class="grid">
       <div class="field full"><label>Call / Name</label><input id="n" placeholder="z. B. Trips Rt Flood – mit der Formation beginnen"></div>
       <div class="field full"><label>Formation</label><select id="f">${formationOptions(null, listView.pers)}${`<optgroup label="Andere Personnel">${options(Object.entries(FORMATIONS).filter(([, f]) => f.personnel !== listView.pers).map(([k, v]) => ({ value: k, label: `${v.label} (${v.personnel})` })))}</optgroup>`}</select></div>
@@ -474,7 +474,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   function drawViewBar() {
     const seg = $('#persSeg');
     ed.pers = basePers();
-    seg.innerHTML = `<span class="badge">${basePers()} Personnel</span> <span class="small muted">${esc(FORMATIONS[play.formation]?.label || '')}</span>`;
+    seg.innerHTML = `<span class="badge">${persLabel(basePers())}</span> <span class="small muted">${esc(FORMATIONS[play.formation]?.label || '')}</span>`;
     const t = $('#defToggle');
     if (t) { t.textContent = ed.showDef ? '🛡 Defense ausblenden' : '🛡 Defense einblenden'; t.classList.toggle('on', ed.showDef); }
   }
@@ -626,7 +626,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       if (isDef && play.opponentConcept) applyConcept(play.offense, play.opponentConcept);
       const before = ed.pers;
       ed.sel = null; play.defenseLocked = false; ed.pers = basePers(); commit({ realign: true });
-      if (!isDef && before !== ed.pers) { listView.pers = ed.pers; toast(`Steht jetzt unter ${ed.pers} Personnel`); }
+      if (!isDef && before !== ed.pers) { listView.pers = ed.pers; toast(`Steht jetzt unter ${persLabel(ed.pers)}`); }
     };
     apply();
   };
