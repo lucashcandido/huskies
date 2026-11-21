@@ -14,12 +14,12 @@
 const KEY = 'huskies.v1';
 const DIRTY_KEY = 'huskies.dirty';
 const VERSION = 2;
-export const COLLS = ['teams', 'athletes', 'rosters', 'personnel', 'formations', 'plays'];
+export const COLLS = ['teams', 'athletes', 'rosters', 'personnel', 'formations', 'plays', 'practices', 'games'];
 const NESTED = { athletes: 'measurements' };            // Unterlisten, die einzeln zusammengeführt werden
 const META = new Set(['_ts', '_mdel', 'updatedAt']);
 
 const emptyDeleted = () => Object.fromEntries(COLLS.map(c => [c, {}]));
-const empty = () => ({ version: VERSION, teams: [], athletes: [], rosters: [], personnel: [], formations: [], plays: [], _deleted: emptyDeleted() });
+const empty = () => ({ version: VERSION, teams: [], athletes: [], rosters: [], personnel: [], formations: [], plays: [], practices: [], games: [], _deleted: emptyDeleted() });
 
 
 function load() {

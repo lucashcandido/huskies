@@ -1,10 +1,10 @@
 // Eigene Formationen: werden im Personnel angelegt und stehen danach im Playbook
 // neben den Standard-Formationen zur Auswahl (Schlüssel 'cf_<id>').
 
-import { db, upsert, remove, uid, persist } from './store.js?v=202611211251';
-import { FORMATIONS, CX, isEligible, OFFENSE_PERSONNEL, formationPlayers, relRoutes, offenseInFormation, personnelOf, applyRunScheme } from './football.js?v=202611211251';
-import { buildDefense } from './defense.js?v=202611211251';
-import { scoped, currentTeamId } from './team.js?v=202611211251';
+import { db, upsert, remove, uid, persist } from './store.js?v=202611211256';
+import { FORMATIONS, CX, isEligible, OFFENSE_PERSONNEL, formationPlayers, relRoutes, offenseInFormation, personnelOf, applyRunScheme } from './football.js?v=202611211256';
+import { buildDefense } from './defense.js?v=202611211256';
+import { scoped, currentTeamId } from './team.js?v=202611211256';
 
 export const keyOf = f => 'cf_' + f.id;
 

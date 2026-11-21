@@ -221,3 +221,10 @@ summary{font-size:13px}
   th{background:#eee;color:#000}
 }
 .seg button.on .muted{color:inherit;opacity:.65}
+/* Stats */
+.scorebox{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.scorebox span{font-size:12px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scorebox b{font-size:28px;font-variant-numeric:tabular-nums}
+.scorebox i{color:var(--muted);font-style:normal;font-size:22px}
+.team-stats tr.grp td{background:var(--panel2);font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;padding:6px 10px}
+.team-stats td input{width:80px}
