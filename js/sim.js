@@ -2,8 +2,8 @@
 // und Tempoverlust bei Cuts), Verteidiger reagieren mit Verzögerung auf ihre
 // Mann- bzw. Zonen-Zuordnung. Ergebnis: Positionen pro Frame + Separation.
 
-import { W, isEligible, clamp } from './football.js?v=202611211018';
-import { ZONES } from './defense.js?v=202611211018';
+import { W, isEligible, clamp } from './football.js?v=202611211111';
+import { ZONES } from './defense.js?v=202611211111';
 
 export const DT = 1 / 30;
 const DEFAULT_SPEED = { WR: 8.6, TE: 7.9, RB: 8.4, FB: 7.6, QB: 7.4, OL: 6, CB: 8.7, S: 8.5, LB: 8.0, DL: 7.2 }; // yd/s

@@ -160,7 +160,7 @@ const FORM_BY = {
   '12': { doubles: 'ace12', trips: 'trips12' }, '21': { doubles: 'proI', trips: 'proI' }, '22': { doubles: 'jumbo22', trips: 'jumbo22' },
 };
 export const personnelOf = formation => FORMATIONS[formation]?.personnel || '11';
-export const familyOf = formation => (['trips', 'bunch', 'empty', 'emptyQuads', 'trips10', 'trips12'].includes(formation) ? 'trips' : 'doubles');
+export const familyOf = formation => FORMATIONS[formation]?.family || ((['trips', 'bunch', 'empty', 'emptyQuads', 'trips10', 'trips12'].includes(formation) ? 'trips' : 'doubles'));
 const canonRole = (role, pers) => Object.entries(ROLE_MAP[pers] || {}).find(([, a]) => a === role)?.[0] || role;
 
 /** Routen relativ zum Startpunkt (dx Richtung Feldmitte), je 11-Rolle */

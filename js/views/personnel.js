@@ -1,10 +1,13 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211018';
-import { fullName, metricValue, fmtMetric } from '../metrics.js?v=202611211018';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211018';
-import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js?v=202611211018';
-import { scoped, currentTeamId } from '../team.js?v=202611211018';
-import { depthOrder } from './rosters.js?v=202611211018';
-import { lineup } from '../lineup.js?v=202611211018';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211111';
+import { fullName, metricValue, fmtMetric } from '../metrics.js?v=202611211111';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211111';
+import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js?v=202611211111';
+import { scoped, currentTeamId } from '../team.js?v=202611211111';
+import { depthOrder } from './rosters.js?v=202611211111';
+import { lineup } from '../lineup.js?v=202611211111';
+import { FORMATIONS, W, isEligible, clamp } from '../football.js?v=202611211111';
+import { VIEW, fieldSVG, playersSVG } from './plays.js?v=202611211111';
+import { keyOf, startPlayers, saveFormation, deleteFormation, playsUsing, mirror, registerCustomFormations } from '../formations.js?v=202611211111';
 
 export function render(root, params) {
   if (params[0]) return renderDetail(root, params[0]);
@@ -106,6 +109,10 @@ function renderDetail(root, id) {
       <button class="danger" id="del">Löschen</button>
     </div>
     <div class="slot-grid" id="slots"></div>
+    ${p.side === 'offense' ? `<div class="section-title" style="display:flex;align-items:center;gap:8px">Formationen (${esc(p.preset === '00' ? 'Empty' : p.preset + ' Personnel')})
+      <span style="flex:1"></span><button class="sm primary" id="addForm">+ Formation</button></div>
+      <p class="legend" style="margin-top:0">Eigene Formationen erscheinen im Playbook bei „Neuer Spielzug“ und in der Formationsauswahl. Spielzüge in einer Formation übernehmen Änderungen automatisch.</p>
+      <div class="cards" id="forms"></div>` : ''}
     <div class="section-title">Übersicht</div>
     <div id="summary"></div>
     <div class="field" style="margin-top:14px"><label>Notizen</label><textarea id="notes" rows="3">${esc(p.notes || '')}</textarea></div>`;
@@ -116,6 +123,20 @@ function renderDetail(root, id) {
   root.querySelector('#auto').onclick = () => { autoFill(p); save(); draw(); toast('Freie Slots besetzt'); };
   root.querySelector('#dup').onclick = () => { const c = structuredClone(p); c.id = uid('per'); c.name += ' (Kopie)'; upsert('personnel', c); location.hash = `#/personnel/${c.id}`; };
   root.querySelector('#del').onclick = () => confirmDialog(`„${p.name}“ löschen?`, () => { remove('personnel', p.id); location.hash = '#/personnel'; });
+
+  function drawForms() {
+    const el = root.querySelector('#forms');
+    if (!el) return;
+    registerCustomFormations();
+    const list = scoped('formations').filter(f => f.personnel === p.preset).sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }));
+    el.innerHTML = list.length ? list.map(f => `<div class="card click" data-f="${f.id}" style="padding:0;overflow:hidden">
+        <svg viewBox="${VIEW.x} -12 ${VIEW.w} 16" style="width:100%;display:block;background:#13532a">${fieldSVG()}${playersSVG({ offense: f.players.map(x => ({ ...x, id: x.role })), defense: [] }, {})}</svg>
+        <div style="padding:8px 12px"><h3 style="margin:0">${esc(f.name)}</h3><div class="small muted">${playsUsing(f).length} Spielzüge</div></div></div>`).join('')
+      : '<div class="empty">Noch keine eigenen Formationen für dieses Personnel.</div>';
+    el.querySelectorAll('[data-f]').forEach(c => c.onclick = () => openFormation(p, scoped('formations').find(f => f.id === c.dataset.f), drawForms));
+  }
+  root.querySelector('#addForm')?.addEventListener('click', () => openFormation(p, null, drawForms));
+  drawForms();
 
   function draw() {
     const used = new Map(p.slots.filter(x => x.athleteId).map(x => [x.athleteId, x.role]));
@@ -141,4 +162,82 @@ function renderDetail(root, id) {
         <td class="num">${a ? fmtMetric('weight', metricValue(a, 'weight')) : ''}</td></tr>`).join('')}</tbody></table></div>`;
   }
   draw();
+}
+
+
+// ---------- Formation-Editor ----------
+function openFormation(per, existing, onDone) {
+  const f = existing ? structuredClone(existing) : { id: null, name: '', personnel: per.preset, personnelId: per.id, players: startPlayers(per.preset) };
+  const templates = Object.entries(FORMATIONS).filter(([k, x]) => x.personnel === per.preset && (!existing || k !== keyOf(existing)));
+  let sel = null, drag = null;
+  const { root, close } = modal({
+    title: existing ? `Formation: ${existing.name}` : 'Neue Formation', width: 980,
+    body: `
+      <div class="grid" style="grid-template-columns:2fr 1fr">
+        <div class="field"><label>Name (so heißt sie im Call)</label><input id="fname" value="${esc(f.name)}" placeholder="z. B. Twins Rt, Trey Lt, Bunch Lt"></div>
+        <div class="field"><label>Startaufstellung übernehmen</label><select id="tpl">${options(templates.map(([k, x]) => ({ value: k, label: x.label + (x.custom ? ' ★' : '') })), '', { empty: '– Vorlage wählen –' })}</select></div>
+      </div>
+      <div class="row" style="margin:10px 0;justify-content:space-between">
+        <span class="small muted">Spieler ziehen (rastet auf ½ Yard ein). Die blaue Linie ist die Line of Scrimmage.</span>
+        <span><button class="sm" id="mirror">⇆ Spiegeln</button></span>
+      </div>
+      <div class="field-wrap"><svg class="field-svg" id="fsvg" viewBox="${VIEW.x} -14 ${VIEW.w} 22"></svg></div>
+      <div id="fcheck" class="small" style="margin-top:8px"></div>`,
+    buttons: [
+      ...(existing ? [{ label: 'Löschen', cls: 'danger', left: true, onClick: () => {
+        const n = playsUsing(existing).length;
+        if (n) { alert(`„${existing.name}“ wird in ${n} Spielzug/Spielzügen verwendet. Bitte dort zuerst eine andere Formation wählen.`); return false; }
+        confirmDialog(`Formation „${existing.name}“ löschen?`, () => { deleteFormation(existing); onDone(); toast('Gelöscht'); });
+      } }] : []),
+      { label: 'Abbrechen', cls: 'ghost' },
+      { label: 'Speichern', cls: 'primary', onClick: () => {
+        f.name = root.querySelector('#fname').value.trim();
+        if (!f.name) { alert('Bitte einen Namen eingeben.'); return false; }
+        const n = saveFormation(f);
+        toast(n ? `Gespeichert – ${n} Spielzug/Spielzüge aktualisiert` : 'Formation gespeichert');
+        onDone();
+      } },
+    ],
+  });
+  const svg = root.querySelector('#fsvg');
+  function draw() {
+    svg.innerHTML = fieldSVG() + playersSVG({ offense: f.players.map(x => ({ ...x, id: x.role })), defense: [] }, { sel: sel ? { side: 'o', id: sel } : null });
+    const onLine = f.players.filter(x => x.y >= -1.25).length;
+    const backs = f.players.filter(x => x.y < -1.25).length;
+    const ok = onLine === 7;
+    root.querySelector('#fcheck').innerHTML = `<span style="color:${ok ? 'var(--green)' : 'var(--yellow)'}">${ok ? '✓' : '⚠'} ${onLine} Spieler an der Line of Scrimmage, ${backs} im Backfield</span>${ok ? '' : ' <span class="muted">(regelkonform sind 7 an der Linie)</span>'}`;
+  }
+  const toField = e => {
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return { x: q.x, y: -q.y };
+  };
+  svg.addEventListener('pointerdown', e => {
+    const g = e.target.closest('[data-pid]');
+    if (!g) { sel = null; draw(); return; }
+    const role = g.dataset.pid.split(':')[1];
+    const pl = f.players.find(x => x.role === role);
+    const pt = toField(e);
+    sel = role; drag = { pl, dx: pl.x - pt.x, dy: pl.y - pt.y };
+    svg.setPointerCapture(e.pointerId);
+    draw();
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const pt = toField(e);
+    const nx = clamp(Math.round((pt.x + drag.dx) * 2) / 2, 0.5, W - 0.5), ny = clamp(Math.round((pt.y + drag.dy) * 2) / 2, -12, -0.5);
+    if (nx !== drag.pl.x || ny !== drag.pl.y) { drag.pl.x = nx; drag.pl.y = ny; draw(); }
+  });
+  const end = () => { drag = null; };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+  root.querySelector('#mirror').onclick = () => { f.players = mirror(f.players); draw(); };
+  root.querySelector('#tpl').onchange = e => {
+    if (!e.target.value) return;
+    f.players = startPlayers(per.preset, e.target.value);
+    if (!root.querySelector('#fname').value.trim()) root.querySelector('#fname').value = FORMATIONS[e.target.value].label.replace(/\s*\(.*\)$/, '');
+    draw();
+  };
+  draw();
+  return close;
 }

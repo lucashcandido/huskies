@@ -1,16 +1,17 @@
-import { db, exportJSON, importJSON, resetAll, subscribe, uid, COLLS } from './store.js?v=202611211018';
-import { modal, toast, download, pickFile, confirmDialog, esc } from './ui.js?v=202611211018';
-import { today } from './metrics.js?v=202611211018';
-import { measurementsCSV } from './views/athletes.js?v=202611211018';
-import { demoTeam } from './demo.js?v=202611211018';
-import * as sync from './sync.js?v=202611211018';
-import { teams, currentTeam, setTeam, clearTeam, createTeam, renameTeam, teamUsage, untaggedCount, adoptUntagged } from './team.js?v=202611211018';
-import { persist } from './store.js?v=202611211018';
-import * as athletes from './views/athletes.js?v=202611211018';
-import * as combine from './views/combine.js?v=202611211018';
-import * as rosters from './views/rosters.js?v=202611211018';
-import * as personnel from './views/personnel.js?v=202611211018';
-import * as plays from './views/plays.js?v=202611211018';
+import { db, exportJSON, importJSON, resetAll, subscribe, uid, COLLS } from './store.js?v=202611211111';
+import { modal, toast, download, pickFile, confirmDialog, esc } from './ui.js?v=202611211111';
+import { today } from './metrics.js?v=202611211111';
+import { measurementsCSV } from './views/athletes.js?v=202611211111';
+import { demoTeam } from './demo.js?v=202611211111';
+import * as sync from './sync.js?v=202611211111';
+import { teams, currentTeam, setTeam, clearTeam, createTeam, renameTeam, teamUsage, untaggedCount, adoptUntagged } from './team.js?v=202611211111';
+import { persist } from './store.js?v=202611211111';
+import { registerCustomFormations } from './formations.js?v=202611211111';
+import * as athletes from './views/athletes.js?v=202611211111';
+import * as combine from './views/combine.js?v=202611211111';
+import * as rosters from './views/rosters.js?v=202611211111';
+import * as personnel from './views/personnel.js?v=202611211111';
+import * as plays from './views/plays.js?v=202611211111';
 
 const routes = { athletes, combine, testday: combine, rosters, personnel, plays };
 const app = document.getElementById('app');
@@ -34,6 +35,7 @@ function route() {
   if (needsSetup()) { chip.classList.add('hidden'); renderSetup(app); return; }
   const team = currentTeam();
   if (!team) { chip.classList.add('hidden'); renderTeamPicker(app); return; }
+  registerCustomFormations();
   chip.classList.remove('hidden');
   chip.querySelector('span').textContent = team.name;
   const hash = location.hash.replace(/^#\/?/, '') || 'athletes';

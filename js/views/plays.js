@@ -1,15 +1,15 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211018';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211018';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211018';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211018';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211018';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211018';
-import { scoped, currentTeamId } from '../team.js?v=202611211018';
-import { depthOrder } from './rosters.js?v=202611211018';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211111';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211111';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211111';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211111';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211111';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211111';
+import { scoped, currentTeamId } from '../team.js?v=202611211111';
+import { depthOrder } from './rosters.js?v=202611211111';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
-const VIEW = { x: -1, y: -32, w: W + 2, h: 44 };
+export const VIEW = { x: -1, y: -32, w: W + 2, h: 44 };
 const f2 = n => (+n).toFixed(2);
 const snap = v => Math.round(v * 2) / 2;
 
@@ -31,8 +31,10 @@ export function viewOf(play, pers, withDefense = true) {
 /** Formationen gruppiert nach Personnel (für Auswahllisten) */
 export function formationOptions(selected, onlyPers) {
   return PERS_KEYS.filter(k => !onlyPers || k === onlyPers).map(k => {
-    const list = Object.entries(FORMATIONS).filter(([, f]) => f.personnel === k);
-    return list.length ? `<optgroup label="${persLabel(k)}">${options(list.map(([key, f]) => ({ value: key, label: f.label })), selected)}</optgroup>` : '';
+    // eigene Formationen (★) zuerst, alphabetisch
+    const list = Object.entries(FORMATIONS).filter(([, f]) => f.personnel === k)
+      .sort(([, a], [, b]) => (b.custom ? 1 : 0) - (a.custom ? 1 : 0) || (a.custom ? a.label.localeCompare(b.label, 'de', { numeric: true }) : 0));
+    return list.length ? `<optgroup label="${persLabel(k)}">${options(list.map(([key, f]) => ({ value: key, label: f.custom ? `★ ${f.label}` : f.label })), selected)}</optgroup>` : '';
   }).join('');
 }
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'de', { numeric: true, sensitivity: 'base' });
@@ -134,7 +136,7 @@ function rebuildDefense(play) {
 }
 
 // ======================= SVG-Bausteine =======================
-function fieldSVG() {
+export function fieldSVG() {
   let s = `<rect x="${VIEW.x - 2}" y="${VIEW.y - 2}" width="${VIEW.w + 4}" height="${VIEW.h + 4}" fill="#0c3219"/>`;
   for (let y = -15; y < 35; y += 5) {
     s += `<rect x="0" y="${-(y + 5)}" width="${f2(W)}" height="5" fill="${((y / 5) & 1) ? '#14552c' : '#175f31'}"/>`;
@@ -156,7 +158,7 @@ function fieldSVG() {
   return s;
 }
 
-function routesSVG(offense, { selId, faint } = {}) {
+export function routesSVG(offense, { selId, faint } = {}) {
   return offense.filter(p => p.route?.length).map(p => {
     const pts = [{ x: p.x, y: p.y }, ...p.route].map(q => `${f2(q.x)},${f2(-q.y)}`).join(' ');
     const c = colorOf(p);
@@ -165,7 +167,7 @@ function routesSVG(offense, { selId, faint } = {}) {
   }).join('');
 }
 
-function playersSVG(play, { pos, sel, names, sepNow, invert } = {}) {
+export function playersSVG(play, { pos, sel, names, sepNow, invert } = {}) {
   let s = '';
   const at = (side, p) => (pos && pos[side][p.id]) || p;
   for (const d of play.defense || []) {
