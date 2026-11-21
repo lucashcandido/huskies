@@ -2,8 +2,8 @@
 // und Tempoverlust bei Cuts), Verteidiger reagieren mit Verzögerung auf ihre
 // Mann- bzw. Zonen-Zuordnung. Ergebnis: Positionen pro Frame + Separation.
 
-import { W, isEligible, clamp } from './football.js?v=202611211159';
-import { ZONES } from './defense.js?v=202611211159';
+import { W, isEligible, clamp } from './football.js?v=202611211207';
+import { ZONES } from './defense.js?v=202611211207';
 
 export const DT = 1 / 30;
 const DEFAULT_SPEED = { WR: 8.6, TE: 7.9, RB: 8.4, FB: 7.6, QB: 7.4, OL: 6, CB: 8.7, S: 8.5, LB: 8.0, DL: 7.2 }; // yd/s
@@ -33,9 +33,11 @@ export function simulate(play, speedOf = () => null) {
     if (p.pos === 'QB') { path = [{ x: p.x, y: p.y }, { x: p.x, y: p.y > -3 ? -7 : p.y - 2 }]; vmax = 5; }
     if (p.pos === 'OL') { path = [{ x: p.x, y: p.y }, { x: p.x, y: p.y - 1.2 }]; vmax = 2; }
     // Run Blocking: Blocker laufen ihren Block (Puller schnell, sonst kurze, kräftige Schritte)
-    if (p.block?.pts?.length && !(p.route || []).length) {
-      path = [{ x: p.x, y: p.y }, ...p.block.pts];
-      vmax = ['pull', 'kick', 'trap'].includes(p.block.type) ? 6 : p.block.type === 'climb' ? 4 : 2.5;
+    // Run-Spielzug: nur Pulls laufen ihren Block, alle anderen Blocker bleiben stehen (Block ist eingezeichnet)
+    if (play.playType === 'run' && p.block?.pts?.length && !(p.route || []).length) {
+      const pull = p.block.pull ?? ['pull', 'kick', 'trap'].includes(p.block.type);
+      if (pull) { path = [{ x: p.x, y: p.y }, ...p.block.pts]; vmax = 6; }
+      else { path = [{ x: p.x, y: p.y }]; }
     }
     return { id: p.id, pos: p.pos, path, seg: 0, x: p.x, y: p.y, v: 0, vmax, routeLen: (p.route || []).length };
   });

@@ -1,11 +1,11 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211159';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211159';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211159';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211159';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211159';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211159';
-import { scoped, currentTeamId } from '../team.js?v=202611211159';
-import { depthOrder } from './rosters.js?v=202611211159';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211207';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211207';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211207';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211207';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211207';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211207';
+import { scoped, currentTeamId } from '../team.js?v=202611211207';
+import { depthOrder } from './rosters.js?v=202611211207';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
@@ -185,7 +185,7 @@ export function blocksSVG(offense, { faint, selId } = {}) {
     const a = pts[pts.length - 2], z = pts[pts.length - 1];
     let dx = z.x - a.x, dy = z.y - a.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
     const bar = 0.75, nx = -dy * bar, ny = dx * bar;
-    const pull = ['pull', 'kick', 'trap'].includes(b.type);
+    const pull = isPull(b);
     const col = pull ? '#fde68a' : '#e5e7eb', w = p.id === selId ? 0.34 : 0.24;
     out += `<g opacity="${faint ? 0.35 : 0.95}"><polyline points="${pts.map(q => `${f2(q.x)},${f2(-q.y)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>
       <line x1="${f2(z.x + nx)}" y1="${f2(-(z.y + ny))}" x2="${f2(z.x - nx)}" y2="${f2(-(z.y - ny))}" stroke="${col}" stroke-width="${w + 0.06}" stroke-linecap="round"/></g>`;
@@ -257,6 +257,22 @@ function renderEditor(root, id) {
   ed.showDef = isDef || localStorage.getItem('huskies.showDef') === '1';
   const editable = () => ed.pers === basePers();
   let V = play;
+  // Run-Spielzüge: OL + Inline-TE zeichnen Blocks (statt Routen)
+  const blockTarget = p => !!p && !isDef && typeOf(play) === 'run' && isLineBlocker(p);
+  /** Bearbeitbare Punktliste eines Spielers (Block oder Route) – legt sie bei Bedarf an */
+  const pathOf = (p, create = false) => {
+    if (blockTarget(p)) {
+      if (!p.block && create) p.block = { type: 'custom', dir: play.runScheme?.dir || 'Rt', pts: [], pull: false };
+      return p.block?.pts || [];
+    }
+    if (!p.route && create) p.route = [];
+    return p.route || [];
+  };
+  /** Nach Freihand-Änderung: Block wird „eigener Block“ (Pull-Status bleibt), Route wird „Freie Route“ */
+  const markCustom = p => {
+    if (blockTarget(p)) { if (p.block) { if (p.block.type !== 'custom') p.block.pull = isPull(p.block); p.block.type = 'custom'; if (!p.block.pts.length) delete p.block; } }
+    else p.routeName = p.route?.length ? 'Freie Route' : '';
+  };
   const buildView = () => { V = viewOf(play, editable() ? null : ed.pers, ed.showDef); };
   buildView();
 
@@ -387,8 +403,8 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       // Griffe für Routenpunkte
       if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
         const p = V.offense.find(x => x.id === ed.sel.id);
-        (p?.route || []).forEach((q, k) => {
-          content += `<circle data-handle="${k}" cx="${f2(q.x)}" cy="${f2(-q.y)}" r=".55" fill="${colorOf(p)}" stroke="#0b0c0e" stroke-width=".12" style="cursor:move"/>`;
+        (p ? pathOf(p) : []).forEach((q, k) => {
+          content += `<circle data-handle="${k}" cx="${f2(q.x)}" cy="${f2(-q.y)}" r=".55" fill="${blockTarget(p) ? '#e5e7eb' : colorOf(p)}" stroke="#0b0c0e" stroke-width=".12" style="cursor:move"/>`;
         });
       }
     }
@@ -406,8 +422,9 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     }
     const p = ed.sel?.side === 'o' ? V.offense.find(x => x.id === ed.sel.id) : null;
     $('#hint').innerHTML = ed.mode === 'draw'
-      ? (p && isEligible(p) ? `Route für <b>${esc(p.role)}</b>: aufs Feld klicken, um Punkte zu setzen. Punkte lassen sich ziehen, Doppelklick löscht einen Punkt. <span class="kbd">⌫</span> entfernt den letzten, <span class="kbd">Esc</span> beendet.`
-        : 'Erst einen Receiver (WR, TE, RB) antippen, dann Punkte aufs Feld setzen.')
+      ? (blockTarget(p) ? `Block für <b>${esc(p.role)}</b>: aufs Feld klicken – wie bei Routen; am letzten Punkt erscheint der Querbalken. Punkte lassen sich ziehen, Doppelklick löscht einen Punkt. <span class="kbd">⌫</span> entfernt den letzten, <span class="kbd">Esc</span> beendet.`
+        : p && isEligible(p) ? `Route für <b>${esc(p.role)}</b>: aufs Feld klicken, um Punkte zu setzen. Punkte lassen sich ziehen, Doppelklick löscht einen Punkt. <span class="kbd">⌫</span> entfernt den letzten, <span class="kbd">Esc</span> beendet.`
+        : `Erst einen ${typeOf(play) === 'run' && !isDef ? 'Blocker (OL/TE) oder ' : ''}Receiver antippen, dann Punkte aufs Feld setzen.`)
       : 'Spieler antippen zum Auswählen, ziehen zum Verschieben. Routen wandern beim Verschieben mit.';
   }
 
@@ -424,11 +441,17 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       const showBlock = editable() && !isDef && typeOf(play) === 'run' && isLineBlocker(p);
       const bdir = p.block?.dir || play.runScheme?.dir || 'Rt';
       const blockPanel = showBlock ? `
-        <div class="field"><label>Block ${p.block ? '· ' + esc(BLOCK_TYPES[p.block.type] || p.block.type) : ''}</label></div>
+        <div class="field"><label>Block ${p.block ? '· ' + esc(p.block.type === 'custom' ? 'Eigener Block' : (BLOCK_TYPES[p.block.type] || p.block.type)) : ''}</label></div>
         <div class="row" style="margin:6px 0"><div class="seg" id="bdirSeg"><button data-d="Lt" class="${bdir === 'Lt' ? 'on' : ''}">◀ Lt</button><button data-d="Rt" class="${bdir === 'Rt' ? 'on' : ''}">Rt ▶</button></div>
           <span class="small muted">Playside</span></div>
         <div class="btn-grid" style="margin-bottom:8px">${Object.entries(BLOCK_TYPES).map(([k, l]) => `<button class="sm ${p.block?.type === k ? 'on' : ''}" data-block="${k}">${esc(l)}</button>`).join('')}
           <button class="sm danger" data-block="">Kein Block</button></div>
+        <div class="btn-grid" style="margin-bottom:8px">
+          <button class="sm ${ed.mode === 'draw' ? 'on' : ''}" id="drawBlockBtn">✎ Block zeichnen</button>
+          <button class="sm" id="undoBlockPt" ${p.block?.pts?.length ? '' : 'disabled'}>Letzten Punkt weg</button>
+        </div>
+        <label style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--txt);display:block;margin-bottom:8px">
+          <input type="checkbox" id="pullChk" style="width:auto" ${p.block && isPull(p.block) ? 'checked' : ''} ${p.block ? '' : 'disabled'}> Pull – bewegt sich in der Animation</label>
         ${play.runScheme ? `<button class="sm" id="resetBlocks" style="margin-bottom:10px">Ganze Line nach Schema (${esc(play.runScheme.run)} ${esc(play.runScheme.dir)})</button>` : ''}` : '';
       card.innerHTML = `<h3>Offense · ${esc(p.role)}</h3>
         <div style="margin-bottom:8px"><b>${a ? esc(fullName(a)) : esc(p.pos)}</b>
@@ -457,6 +480,9 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
         else p.block = { type: t, dir: curDir, pts: blockPoints(t, curDir === 'Lt' ? -1 : 1, p, play.offense) };
         commit();
       });
+      card.querySelector('#drawBlockBtn')?.addEventListener('click', () => setMode(ed.mode === 'draw' ? 'move' : 'draw'));
+      card.querySelector('#undoBlockPt')?.addEventListener('click', () => { p.block.pts.pop(); markCustom(p); commit(); });
+      card.querySelector('#pullChk')?.addEventListener('change', e => { if (p.block) { p.block.pull = e.target.checked; commit(); } });
       card.querySelector('#resetBlocks')?.addEventListener('click', () => { autoBlocks(play.offense, play.runScheme.run, play.runScheme.dir); commit(); toast('Blocking zurückgesetzt'); });
       card.querySelectorAll('[data-run]').forEach(b => b.onclick = () => {
         p.route = runPoints(b.dataset.run, b.dataset.dir, p); p.routeName = `${b.dataset.run} ${b.dataset.dir}`;
@@ -607,10 +633,11 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     }
     if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
       const p = play.offense.find(x => x.id === ed.sel.id);
-      if (p && isEligible(p)) {
-        p.route = p.route || [];
-        p.route.push({ x: clamp(snap(f.x), 0.5, W - 0.5), y: clamp(snap(f.y), -12, 31) });
-        p.routeName = 'Freie Route';
+      if (p && (isEligible(p) || blockTarget(p))) {
+        // Freihand auf einem Vorlage-Block: neu beginnen (Pull-Status übernehmen)
+        if (blockTarget(p) && p.block && p.block.type !== 'custom') p.block = { type: 'custom', dir: p.block.dir, pts: [], pull: isPull(p.block) };
+        pathOf(p, true).push({ x: clamp(snap(f.x), 0.5, W - 0.5), y: clamp(snap(f.y), -12, 31) });
+        markCustom(p);
         commit();
         return;
       }
@@ -627,11 +654,11 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       const ddx = nx - obj.x, ddy = ny - obj.y;
       if (!ddx && !ddy) return;
       obj.x = nx; obj.y = ny;
-      if (side === 'o') (obj.route || []).forEach(q => { q.x = clamp(q.x + ddx, 0.5, W - 0.5); q.y += ddy; });
+      if (side === 'o') [...(obj.route || []), ...(obj.block?.type === 'custom' ? obj.block.pts : [])].forEach(q => { q.x = clamp(q.x + ddx, 0.5, W - 0.5); q.y += ddy; });
       ed.drag.moved = true;
     } else {
       const p = play.offense.find(x => x.id === ed.sel.id);
-      const q = p.route[ed.drag.k];
+      const q = pathOf(p)[ed.drag.k];
       q.x = clamp(snap(f.x), 0.5, W - 0.5); q.y = clamp(snap(f.y), -12, 31);
       ed.drag.moved = true;
     }
@@ -643,7 +670,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     if (!d.moved) return;
     if (d.kind === 'player' && d.side === 'd') play.defenseLocked = true;
     if (d.kind === 'player' && d.side === 'o') play.offense.forEach(p => refreshBlock(p, play.offense));
-    if (d.kind === 'pt') { const p = play.offense.find(x => x.id === ed.sel.id); p.routeName = 'Freie Route'; }
+    if (d.kind === 'pt') markCustom(play.offense.find(x => x.id === ed.sel.id));
     commit({ realign: d.kind === 'player' && d.side === 'o' });
   };
   svg.addEventListener('pointerup', endDrag);
@@ -652,8 +679,8 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     const handle = e.target.closest('[data-handle]');
     if (handle && ed.sel?.side === 'o') {
       const p = play.offense.find(x => x.id === ed.sel.id);
-      p.route.splice(+handle.dataset.handle, 1);
-      p.routeName = p.route.length ? 'Freie Route' : '';
+      pathOf(p).splice(+handle.dataset.handle, 1);
+      markCustom(p);
       commit();
     }
   });
@@ -662,7 +689,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
     if (e.key === 'Escape' && ed.mode === 'draw') setMode('move');
     if ((e.key === 'Backspace' || e.key === 'Delete') && ed.mode === 'draw' && ed.sel?.side === 'o') {
       const p = play.offense.find(x => x.id === ed.sel.id);
-      if (p?.route?.length) { e.preventDefault(); p.route.pop(); commit(); }
+      if (p && pathOf(p).length) { e.preventDefault(); pathOf(p).pop(); markCustom(p); commit(); }
     }
     if (e.key === ' ' && !e.repeat) { e.preventDefault(); $('#playBtn').click(); }
   };

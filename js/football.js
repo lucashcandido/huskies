@@ -277,9 +277,12 @@ export function applyRunScheme(offense, scheme) {
   return autoBlocks(offense, scheme.run, scheme.dir);
 }
 
+/** Pull = bewegt sich in der Animation (Preset-Pulls oder als Pull markierter eigener Block) */
+export const isPull = b => !!b && (b.pull ?? ['pull', 'kick', 'trap'].includes(b.type));
+
 /** Block eines Spielers neu berechnen (z. B. nach Verschieben) */
 export function refreshBlock(p, offense) {
-  if (!p.block) return;
+  if (!p.block || p.block.type === 'custom') return;
   p.block.pts = blockPoints(p.block.type, p.block.dir === 'Lt' ? -1 : 1, p, offense);
 }
 
