@@ -2,8 +2,8 @@
 // und Tempoverlust bei Cuts), Verteidiger reagieren mit Verzögerung auf ihre
 // Mann- bzw. Zonen-Zuordnung. Ergebnis: Positionen pro Frame + Separation.
 
-import { W, isEligible, clamp } from './football.js?v=202611211248';
-import { ZONES } from './defense.js?v=202611211248';
+import { W, isEligible, clamp } from './football.js?v=202611211251';
+import { ZONES } from './defense.js?v=202611211251';
 
 export const DT = 1 / 30;
 const DEFAULT_SPEED = { WR: 8.6, TE: 7.9, RB: 8.4, FB: 7.6, QB: 7.4, OL: 6, CB: 8.7, S: 8.5, LB: 8.0, DL: 7.2 }; // yd/s
@@ -116,7 +116,7 @@ export function simulate(play, speedOf = () => null) {
         }
       } else if (qb) { // Rush
         tx = qb.x; ty = qb.y;
-        if (d.y < 1.2) vmax = d.pos === 'DL' ? 2.2 : 3; // im Block
+        if (d.y < 1.6) vmax = d.pos === 'DL' ? 2.2 : 3; // im Block
       }
       // Lenkverhalten mit begrenzter Beschleunigung
       const dx = tx - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy);

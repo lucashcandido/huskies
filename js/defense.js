@@ -2,7 +2,7 @@
 // (Mann-Deckung, Zone oder Pass Rush). Bewusst vereinfacht, aber nah an den
 // gängigen Lehrbuch-Varianten.
 
-import { W, CX, HASH_L, HASH_R, isEligible, clamp, DEFENSE_PERSONNEL } from './football.js?v=202611211248';
+import { W, CX, HASH_L, HASH_R, isEligible, clamp, DEFENSE_PERSONNEL } from './football.js?v=202611211251';
 
 export const ZONES = {
   deepL3:   { label: 'Deep 1/3 links',   L: [W / 6, 16],       r: [0, W / 3 + 4, 8, 50], deep: true },
@@ -70,19 +70,21 @@ export function buildDefense(offense, concept = 'cover3', preset = 'auto') {
 
   // --- Front ---
   const teL = te.find(t => t.x < CX), teR = te.find(t => t.x > CX);
-  add('LE', 'DL', teL ? teL.x - 1 : CX - 5.5, 1);
-  add('LT', 'DL', CX - 1.5, 1);
-  add('RT', 'DL', CX + 1.5, 1);
-  add('RE', 'DL', teR ? teR.x + 1 : CX + 5.5, 1);
+  // DL bewusst mit Abstand zur Line of Scrimmage, damit die Blocks dazwischen gut lesbar sind
+  const DLY = 2.2, LBY = 6;
+  add('LE', 'DL', teL ? teL.x - 1 : CX - 5.5, DLY);
+  add('LT', 'DL', CX - 1.5, DLY);
+  add('RT', 'DL', CX + 1.5, DLY);
+  add('RE', 'DL', teR ? teR.x + 1 : CX + 5.5, DLY);
 
   // --- Linebacker ---
   const roles = DEFENSE_PERSONNEL[pre].slots.map(x => x.role);
   if (roles.includes('S')) {         // 4-3
-    add('W', 'LB', CX - 4 * s, 4.5); add('M', 'LB', CX, 5); add('S', 'LB', CX + 4 * s, 4.5);
+    add('W', 'LB', CX - 4 * s, LBY); add('M', 'LB', CX, LBY + 0.5); add('S', 'LB', CX + 4 * s, LBY);
   } else if (roles.includes('W')) {  // Nickel
-    add('W', 'LB', CX - 2.5 * s, 4.5); add('M', 'LB', CX + 2.5 * s, 4.5);
+    add('W', 'LB', CX - 2.5 * s, LBY); add('M', 'LB', CX + 2.5 * s, LBY);
   } else {
-    add('M', 'LB', CX, 5);
+    add('M', 'LB', CX, LBY + 0.5);
   }
 
   // --- Secondary: Grundposition ---
@@ -114,7 +116,7 @@ export function buildDefense(offense, concept = 'cover3', preset = 'auto') {
       free.delete(id);
       const press = D[id].pos === 'CB';
       const backfield = r.y < -2.5 && Math.abs(r.x - CX) < 6;
-      setPos(id, r.x + inside(r.x) * 0.7, backfield ? 4.5 : press ? 1.5 : 3.5);
+      setPos(id, r.x + inside(r.x) * 0.7, backfield ? LBY : press ? 1.8 : 3.5);
     };
     if (concept === 'cover1') {
       D.FS.assign = { type: 'zone', zone: 'deepMid' }; free.delete('FS'); setPos('FS', CX, 13);
@@ -137,7 +139,7 @@ export function buildDefense(offense, concept = 'cover3', preset = 'auto') {
       if (robber) { zone(robber, 'hookM'); free.delete(robber); setPos(robber, CX, 7); }
     }
     for (const id of free) { // Blitz
-      setPos(id, D[id].x, 3);
+      setPos(id, D[id].x, 3.5);
     }
   } else if (concept === 'cover2' || concept === 'tampa2') {
     zone('CBL', 'flatL'); zone('CBR', 'flatR');
@@ -155,7 +157,7 @@ export function buildDefense(offense, concept = 'cover3', preset = 'auto') {
     if (outerL) setPos('CBL', outerL.x - 1, 7); if (outerR) setPos('CBR', outerR.x + 1, 7);
     zone('FS', 'deepM3'); setPos('FS', CX, 13);
     zone('SS', 'curlFlat' + side(true));
-    setPos('SS', slotS ? slotS.x + inside(slotS.x) * 1.5 : CX + 9 * s, 6);
+    setPos('SS', slotS ? slotS.x + inside(slotS.x) * 1.5 : CX + 9 * s, 7.5);
     zone('M', 'hookM');
     const st = strongDef(); if (st) zone(st, 'hook' + side(true));
     const w = weakDef(); if (w) zone(w, 'curlFlat' + side(false));

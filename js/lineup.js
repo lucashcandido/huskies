@@ -4,7 +4,7 @@
 // automatisch nach Position auf die passenden Plätze verteilt (Reihenfolge
 // nach 40-yd-Zeit). Per Drag & Drop wird der Stand dann fest gespeichert.
 
-import { metricValue } from './metrics.js?v=202611211248';
+import { metricValue } from './metrics.js?v=202611211251';
 
 // col/row beziehen sich auf ein 9-spaltiges Raster (Darstellung im Roster)
 export const OFFENSE_SLOTS = [
