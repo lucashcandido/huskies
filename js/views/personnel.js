@@ -1,10 +1,10 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211016';
-import { fullName, metricValue, fmtMetric } from '../metrics.js?v=202611211016';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211016';
-import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js?v=202611211016';
-import { scoped, currentTeamId } from '../team.js?v=202611211016';
-import { depthOrder } from './rosters.js?v=202611211016';
-import { lineup } from '../lineup.js?v=202611211016';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211018';
+import { fullName, metricValue, fmtMetric } from '../metrics.js?v=202611211018';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211018';
+import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, ROLE_NAMES } from '../football.js?v=202611211018';
+import { scoped, currentTeamId } from '../team.js?v=202611211018';
+import { depthOrder } from './rosters.js?v=202611211018';
+import { lineup } from '../lineup.js?v=202611211018';
 
 export function render(root, params) {
   if (params[0]) return renderDetail(root, params[0]);

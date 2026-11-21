@@ -2,7 +2,7 @@
 // (Mann-Deckung, Zone oder Pass Rush). Bewusst vereinfacht, aber nah an den
 // gängigen Lehrbuch-Varianten.
 
-import { W, CX, HASH_L, HASH_R, isEligible, clamp, DEFENSE_PERSONNEL } from './football.js?v=202611211016';
+import { W, CX, HASH_L, HASH_R, isEligible, clamp, DEFENSE_PERSONNEL } from './football.js?v=202611211018';
 
 export const ZONES = {
   deepL3:   { label: 'Deep 1/3 links',   L: [W / 6, 16],       r: [0, W / 3 + 4, 8, 50], deep: true },

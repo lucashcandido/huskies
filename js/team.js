@@ -1,7 +1,7 @@
 // Aktives Team: wird einmal pro Gerät gewählt und gilt dann für alle Ansichten.
 // Athlet:innen, Roster, Personnel und Spielzüge gehören jeweils zu einem Team (teamId).
 
-import { db, upsert, uid, persist } from './store.js?v=202611211016';
+import { db, upsert, uid, persist } from './store.js?v=202611211018';
 
 const KEY = 'huskies.team';
 export const TEAM_COLLS = ['athletes', 'rosters', 'personnel', 'plays'];

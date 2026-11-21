@@ -1,11 +1,11 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211016';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211016';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211016';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211016';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211016';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211016';
-import { scoped, currentTeamId } from '../team.js?v=202611211016';
-import { depthOrder } from './rosters.js?v=202611211016';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211018';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211018';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211018';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211018';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211018';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211018';
+import { scoped, currentTeamId } from '../team.js?v=202611211018';
+import { depthOrder } from './rosters.js?v=202611211018';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
@@ -47,7 +47,7 @@ export function render(root, params) {
   const off = listView.side === 'offense';
   const persCount = k => all.filter(p => sideOf(p) === 'offense' && personnelOf(p.formation) === k).length;
   // Offense: nur das gewählte Personnel; alphabetisch, damit gleiche Formationen (Anfang des Calls) beieinander stehen
-  const plays = all.filter(p => sideOf(p) === listView.side && (!off || personnelOf(p.formation) === listView.pers)).sort(byName);
+  const plays = all.filter(p => sideOf(p) === listView.side && (!off || listView.pers === 'all' || personnelOf(p.formation) === listView.pers)).sort(byName);
   const count = s => all.filter(p => sideOf(p) === s).length;
   root.innerHTML = `
     <div class="page-head">
@@ -60,15 +60,15 @@ export function render(root, params) {
       <button data-s="offense" class="${off ? 'on' : ''}">Offense (${count('offense')})</button>
       <button data-s="defense" class="${off ? '' : 'on'}">Defense (${count('defense')})</button>
     </div>
-    ${off ? `<div class="seg" id="persTabs">${PERS_KEYS.map(k => `<button data-p="${k}" class="${listView.pers === k ? 'on' : ''}">${persLabel(k)} <span class="muted">(${persCount(k)})</span></button>`).join('')}</div>` : ''}
+    ${off ? `<div class="seg" id="persTabs"><button data-p="all" class="${listView.pers === 'all' ? 'on' : ''}">Alle <span class="muted">(${count('offense')})</span></button>${PERS_KEYS.map(k => `<button data-p="${k}" class="${listView.pers === k ? 'on' : ''}">${persLabel(k)} <span class="muted">(${persCount(k)})</span></button>`).join('')}</div>` : ''}
     </div>
     ${plays.length ? `<div class="cards">${plays.map(p => `<div class="card click" data-id="${p.id}" style="padding:0;overflow:hidden">
       <svg viewBox="${VIEW.x} -26 ${VIEW.w} 34" style="width:100%;display:block;background:#13532a">${(v => fieldSVG() + routesSVG(v.offense) + playersSVG(v, {}))(off ? viewOf(p, null, false) : p)}</svg>
       <div style="padding:10px 12px"><h3>${esc(p.name)}</h3>
       <div class="small muted">${off
-        ? `${esc(FORMATIONS[p.formation]?.label || '')}`
+        ? `${listView.pers === 'all' ? `<span class="badge">${persLabel(personnelOf(p.formation))}</span> ` : ''}${esc(FORMATIONS[p.formation]?.label || '')}`
         : `${esc(CONCEPTS[p.concept]?.label || '')} · gegen ${esc(OFFENSE_CONCEPTS[p.opponentConcept]?.label || 'Offense')} (${esc(FORMATIONS[p.formation]?.label || '')})`}</div></div>
-    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? `Spielzüge in ${persLabel(listView.pers)}` : 'Defense-Spielzüge'}. Leg den ersten an!</div>`}`;
+    </div>`).join('')}</div>` : `<div class="empty">Noch keine ${off ? `${listView.pers === 'all' ? 'Offense-Spielzüge' : `Spielzüge in ${persLabel(listView.pers)}`}` : 'Defense-Spielzüge'}. Leg den ersten an!</div>`}`;
   root.querySelectorAll('[data-id]').forEach(c => c.onclick = () => location.hash = `#/plays/${c.dataset.id}`);
   root.querySelectorAll('#sideTabs button').forEach(b => b.onclick = () => { listView.side = b.dataset.s; render(root, []); });
   root.querySelectorAll('#persTabs button').forEach(b => b.onclick = () => { listView.pers = b.dataset.p; render(root, []); });
@@ -104,10 +104,10 @@ function newDefensePlay() {
 function newPlay() {
   const s = db();
   modal({
-    title: `Neuer Spielzug · ${persLabel(listView.pers)}`, width: 520,
+    title: listView.pers === 'all' ? 'Neuer Offense-Spielzug' : `Neuer Spielzug · ${persLabel(listView.pers)}`, width: 520,
     body: `<div class="grid">
       <div class="field full"><label>Call / Name</label><input id="n" placeholder="z. B. Trips Rt Flood – mit der Formation beginnen"></div>
-      <div class="field full"><label>Formation</label><select id="f">${formationOptions(null, listView.pers)}${`<optgroup label="Andere Personnel">${options(Object.entries(FORMATIONS).filter(([, f]) => f.personnel !== listView.pers).map(([k, v]) => ({ value: k, label: `${v.label} (${v.personnel})` })))}</optgroup>`}</select></div>
+      <div class="field full"><label>Formation</label><select id="f">${listView.pers === 'all' ? formationOptions('doubles') : formationOptions(null, listView.pers) + `<optgroup label="Andere Personnel">${options(Object.entries(FORMATIONS).filter(([, f]) => f.personnel !== listView.pers).map(([k, v]) => ({ value: k, label: `${v.label} (${v.personnel})` })))}</optgroup>`}</select></div>
       <div class="field full"><label>Offense-Personnel</label><select id="op">${options(scoped('personnel').filter(p => p.side === 'offense').map(p => ({ value: p.id, label: p.name })), '', { empty: '– ohne (nur Positionen) –' })}</select></div>
       <div class="field full"><label>Defense-Konzept</label><select id="c">${options(Object.entries(CONCEPTS).map(([k, v]) => ({ value: k, label: v.label })), 'cover3')}</select></div>
     </div>`,
@@ -225,7 +225,7 @@ function renderEditor(root, id) {
   // Ansicht: Personnel (Standard 11) und Defense ein/aus (bei Offense-Spielzügen, gemerkt pro Gerät)
   const basePers = () => personnelOf(play.formation);
   ed.pers = basePers();
-  if (!isDef) listView.pers = ed.pers;   // zurück in der Liste landet man im Personnel dieses Spielzugs
+  if (!isDef && listView.pers !== 'all') listView.pers = ed.pers;   // zurück in der Liste landet man im Personnel dieses Spielzugs
   ed.showDef = isDef || localStorage.getItem('huskies.showDef') === '1';
   const editable = () => ed.pers === basePers();
   let V = play;
@@ -626,7 +626,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
       if (isDef && play.opponentConcept) applyConcept(play.offense, play.opponentConcept);
       const before = ed.pers;
       ed.sel = null; play.defenseLocked = false; ed.pers = basePers(); commit({ realign: true });
-      if (!isDef && before !== ed.pers) { listView.pers = ed.pers; toast(`Steht jetzt unter ${persLabel(ed.pers)}`); }
+      if (!isDef && before !== ed.pers) { if (listView.pers !== 'all') listView.pers = ed.pers; toast(`Steht jetzt unter ${persLabel(ed.pers)}`); }
     };
     apply();
   };
