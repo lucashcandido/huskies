@@ -1,15 +1,17 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211221';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211221';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211221';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211221';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211221';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211221';
-import { scoped, currentTeamId } from '../team.js?v=202611211221';
-import { depthOrder } from './rosters.js?v=202611211221';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211248';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211248';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211248';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211248';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211248';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211248';
+import { scoped, currentTeamId } from '../team.js?v=202611211248';
+import { depthOrder } from './rosters.js?v=202611211248';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
-export const VIEW = { x: -1, y: -32, w: W + 2, h: 44 };
+// Sichtbarer Ausschnitt: 10 yd Backfield bis 28 yd downfield (größeres Feld zum Zeichnen)
+export const VIEW = { x: -1, y: -28, w: W + 2, h: 38 };
+const R = 0.72;   // Radius der Spieler-Kreise (Yards)
 const f2 = n => (+n).toFixed(2);
 const snap = v => Math.round(v * 2) / 2;
 
@@ -205,20 +207,20 @@ export function playersSVG(play, { pos, sel, names, sepNow, invert } = {}) {
   for (const d of play.defense || []) {
     const q = at('d', d), isSel = sel && sel.side === 'd' && sel.id === d.id;
     s += `<g data-pid="d:${d.id}" transform="translate(${f2(q.x)},${f2(-q.y)})" style="cursor:pointer">
-      ${isSel ? '<circle r="1.55" fill="none" stroke="#5aa0e6" stroke-width=".25"/>' : ''}
-      <circle r="1" fill="#3a1515" stroke="#ff6b5b" stroke-width=".18"/>
-      <text y=".36" font-size="1" text-anchor="middle" font-weight="800" fill="#ffb3a7">${esc(d.label)}</text>
+      ${isSel ? `<circle r="${R + 0.45}" fill="none" stroke="#5aa0e6" stroke-width=".22"/>` : ''}
+      <circle r="${R}" fill="#3a1515" stroke="#ff6b5b" stroke-width=".15"/>
+      <text y=".26" font-size=".74" text-anchor="middle" font-weight="800" fill="#ffb3a7">${esc(d.label)}</text>
       ${names?.d?.[d.role] ? `<text y="-1.45" font-size=".72" text-anchor="middle" fill="#ffd9d3" stroke="#0c3219" stroke-width=".25" paint-order="stroke">${esc(names.d[d.role])}</text>` : ''}
     </g>`;
   }
   for (const p of play.offense) {
     const q = at('o', p), isSel = sel && sel.side === 'o' && sel.id === p.id;
-    const ring = sepNow && sepNow[p.id] !== undefined ? `<circle r="1.6" fill="none" stroke="${sepColor(sepNow[p.id], invert)}" stroke-width=".3"/>` : '';
+    const ring = sepNow && sepNow[p.id] !== undefined ? `<circle r="${R + 0.5}" fill="none" stroke="${sepColor(sepNow[p.id], invert)}" stroke-width=".26"/>` : '';
     const elig = isEligible(p);
     s += `<g data-pid="o:${p.id}" transform="translate(${f2(q.x)},${f2(-q.y)})" style="cursor:pointer">
-      ${ring}${isSel ? '<circle r="1.55" fill="none" stroke="#5aa0e6" stroke-width=".25"/>' : ''}
-      <circle r="1" fill="${p.pos === 'OL' ? '#c7ccd4' : '#f2f4f7'}" stroke="${elig ? colorOf(p) : '#0b0c0e'}" stroke-width="${elig ? 0.28 : 0.12}"/>
-      <text y=".33" font-size="${p.role.length > 1 ? 0.75 : 0.95}" text-anchor="middle" font-weight="800" fill="#0b0c0e">${esc(p.role)}</text>
+      ${ring}${isSel ? `<circle r="${R + 0.45}" fill="none" stroke="#5aa0e6" stroke-width=".22"/>` : ''}
+      <circle r="${R}" fill="${p.pos === 'OL' ? '#c7ccd4' : '#f2f4f7'}" stroke="${elig ? colorOf(p) : '#0b0c0e'}" stroke-width="${elig ? 0.22 : 0.1}"/>
+      <text y=".24" font-size="${p.role.length > 1 ? 0.55 : 0.72}" text-anchor="middle" font-weight="800" fill="#0b0c0e">${esc(p.role)}</text>
       ${names?.o?.[p.role] && p.pos !== 'OL' ? `<text y="2.1" font-size=".72" text-anchor="middle" fill="#fff" stroke="#0c3219" stroke-width=".25" paint-order="stroke">${esc(names.o[p.role])}</text>` : ''}
     </g>`;
   }
@@ -380,8 +382,6 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   let M = maps();
   const speedOf = (p, side) => { const a = side === 'offense' ? M.oa[p.role] : M.da[p.role]; return a ? athleteSpeedYps(a) : null; };
 
-  // Bei Offense-Spielzügen keine Namen der Verteidiger anzeigen (bei Defense-Spielzügen schon)
-  const shownNames = () => (isDef ? M.names : { o: M.names.o, d: {} });
   const save = () => upsert('plays', play);
   function recompute() { buildView(); M = maps(); ed.sim = simulate(V, speedOf); drawResults(); drawViewBar(); }
 
@@ -403,16 +403,16 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
         content += `<polyline points="${pts}" fill="none" stroke="#ff6b5b" stroke-width=".12" opacity=".5"/>`;
       }
       const sepNow = ed.showDef ? Object.fromEntries(Object.entries(ed.sim.separation).map(([k, v]) => [k, v[i]])) : null;
-      content += playersSVG(V, { pos: fr, sel: ed.sel, names: shownNames(), sepNow, invert: isDef });
+      content += playersSVG(V, { pos: fr, sel: ed.sel, sepNow, invert: isDef });
     } else {
       content += assignmentsSVG(V, { sel: ed.sel, showZones: ed.showZones });
       content += blocksSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null }) + routesSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
-      content += playersSVG(V, { sel: ed.sel, names: shownNames() });
+      content += playersSVG(V, { sel: ed.sel });
       // Griffe für Routenpunkte
       if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
         const p = V.offense.find(x => x.id === ed.sel.id);
         (p ? pathOf(p) : []).forEach((q, k) => {
-          content += `<circle data-handle="${k}" cx="${f2(q.x)}" cy="${f2(-q.y)}" r=".55" fill="${blockTarget(p) ? '#e5e7eb' : colorOf(p)}" stroke="#0b0c0e" stroke-width=".12" style="cursor:move"/>`;
+          content += `<circle data-handle="${k}" cx="${f2(q.x)}" cy="${f2(-q.y)}" r=".42" fill="${blockTarget(p) ? '#e5e7eb' : colorOf(p)}" stroke="#0b0c0e" stroke-width=".12" style="cursor:move"/>`;
         });
       }
     }
