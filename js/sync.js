@@ -12,7 +12,7 @@
 //   mit sha zurückschreiben; bei Konflikt (409/422) neu laden und wiederholen.
 //   Offline-Änderungen bleiben „dirty“ und werden nachgereicht.
 
-import { COLLS, fileFor, mergeRemote, sameAsRemote, dirtyColls, markClean, markAllDirty, notifyRemote } from './store.js?v=202611211207';
+import { COLLS, fileFor, mergeRemote, sameAsRemote, dirtyColls, markClean, markAllDirty, notifyRemote } from './store.js?v=202611211210';
 
 const API = 'https://api.github.com';
 const CFG_KEY = 'huskies.sync';

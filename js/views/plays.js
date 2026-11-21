@@ -1,11 +1,11 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211207';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211207';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211207';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211207';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211207';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211207';
-import { scoped, currentTeamId } from '../team.js?v=202611211207';
-import { depthOrder } from './rosters.js?v=202611211207';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211210';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211210';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211210';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211210';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211210';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211210';
+import { scoped, currentTeamId } from '../team.js?v=202611211210';
+import { depthOrder } from './rosters.js?v=202611211210';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
@@ -374,6 +374,8 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   let M = maps();
   const speedOf = (p, side) => { const a = side === 'offense' ? M.oa[p.role] : M.da[p.role]; return a ? athleteSpeedYps(a) : null; };
 
+  // Bei Offense-Spielzügen keine Namen der Verteidiger anzeigen (bei Defense-Spielzügen schon)
+  const shownNames = () => (isDef ? M.names : { o: M.names.o, d: {} });
   const save = () => upsert('plays', play);
   function recompute() { buildView(); M = maps(); ed.sim = simulate(V, speedOf); drawResults(); drawViewBar(); }
 
@@ -395,11 +397,11 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
         content += `<polyline points="${pts}" fill="none" stroke="#ff6b5b" stroke-width=".12" opacity=".5"/>`;
       }
       const sepNow = ed.showDef ? Object.fromEntries(Object.entries(ed.sim.separation).map(([k, v]) => [k, v[i]])) : null;
-      content += playersSVG(V, { pos: fr, sel: ed.sel, names: M.names, sepNow, invert: isDef });
+      content += playersSVG(V, { pos: fr, sel: ed.sel, names: shownNames(), sepNow, invert: isDef });
     } else {
       content += assignmentsSVG(V, { sel: ed.sel, showZones: ed.showZones });
       content += blocksSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null }) + routesSVG(V.offense, { selId: ed.sel?.side === 'o' ? ed.sel.id : null });
-      content += playersSVG(V, { sel: ed.sel, names: M.names });
+      content += playersSVG(V, { sel: ed.sel, names: shownNames() });
       // Griffe für Routenpunkte
       if (ed.mode === 'draw' && ed.sel?.side === 'o' && editable()) {
         const p = V.offense.find(x => x.id === ed.sel.id);
