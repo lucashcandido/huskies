@@ -1,8 +1,8 @@
-import { db, upsert, remove, uid } from '../store.js';
+import { db, upsert, remove, uid } from '../store.js?v=202611211016';
 import { METRICS, METRIC, POSITIONS, fullName, ageOf, metricValue, latestValue, fmt, fmtMetric, parseNum,
-  plausibility, quartileClass, sortedMeasurements, today, fmtDate, bestValue } from '../metrics.js';
-import { esc, modal, toast, confirmDialog, options, sparkline } from '../ui.js';
-import { scoped, currentTeamId, teams } from '../team.js';
+  plausibility, quartileClass, sortedMeasurements, today, fmtDate, bestValue } from '../metrics.js?v=202611211016';
+import { esc, modal, toast, confirmDialog, options, sparkline } from '../ui.js?v=202611211016';
+import { scoped, currentTeamId, teams } from '../team.js?v=202611211016';
 
 const view = { q: '', pos: '', mode: 'latest', sort: 'name', dir: 1 };
 

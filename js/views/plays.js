@@ -1,11 +1,11 @@
-import { db, upsert, remove, uid, get } from '../store.js';
-import { fullName, athleteSpeedYps } from '../metrics.js';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js';
-import { scoped, currentTeamId } from '../team.js';
-import { depthOrder } from './rosters.js';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211016';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211016';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211016';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211016';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211016';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211016';
+import { scoped, currentTeamId } from '../team.js?v=202611211016';
+import { depthOrder } from './rosters.js?v=202611211016';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';

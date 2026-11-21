@@ -51,3 +51,7 @@ js/sim.js          Simulation & Separation
 js/demo.js         Beispieldaten
 js/views/*.js      Seiten
 ```
+
+## Neue Version veröffentlichen
+
+Vor jedem Commit `node tools/stamp-version.mjs` ausführen. Das hängt an alle Skript- und Stylesheet-Verweise eine neue Versionsnummer an, sodass Browser nach dem Neuladen sofort die neue Version laden statt bis zu 10 Minuten eine zwischengespeicherte.
