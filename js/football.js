@@ -194,6 +194,27 @@ export function offenseInFormation(formation, rel) {
   return { formation, players };
 }
 
+// ---------- Laufwege für Run-Spielzüge (Ballträger) ----------
+// dx positiv = zur Playside (Rt), dy = Richtung Endzone; relativ zum Startpunkt des Ballträgers
+export const RUN_PATHS = {
+  'Dive':          [[0, 2], [0, 9]],
+  'Iso':           [[0.5, 2.5], [1, 10]],
+  'Inside Zone':   [[1.5, 2.5], [2, 4.5], [2.5, 11]],
+  'Outside Zone':  [[4, 1.5], [7, 3.5], [8, 11]],
+  'Power':         [[1, 1.5], [3, 3.5], [3.5, 11]],
+  'Counter':       [[-1.5, 0.5], [2, 3], [3.5, 11]],
+  'Trap':          [[-0.5, 1.5], [1, 4], [1, 11]],
+  'Sweep / Toss':  [[6, 0], [10, 2.5], [11, 11]],
+  'Draw':          [[0, -0.5], [0, 1.5], [0.5, 10]],
+};
+/** Laufweg als absolute Punkte; dir = 'Rt' oder 'Lt' */
+export function runPoints(name, dir, p) {
+  const def = RUN_PATHS[name];
+  if (!def) return [];
+  const s = dir === 'Lt' ? -1 : 1;
+  return def.map(([dx, dy]) => ({ x: clamp(p.x + dx * s, 0.5, W - 0.5), y: p.y + dy }));
+}
+
 /** Wandelt eine Routen-Vorlage in absolute Punkte für einen Spieler um */
 export function routePoints(name, p) {
   const def = ROUTES[name];
