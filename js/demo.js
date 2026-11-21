@@ -2,8 +2,8 @@
 // Alle erzeugten Einträge tragen demo: true und lassen sich über
 // „⋯ Daten → Beispieldaten entfernen“ wieder vollständig löschen.
 
-import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, OFFENSE_CONCEPTS, applyConcept, offenseInFormation, ROUTES, runPoints, autoBlocks } from './football.js?v=202611211210';
-import { buildDefense } from './defense.js?v=202611211210';
+import { OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, formationPlayers, OFFENSE_CONCEPTS, applyConcept, offenseInFormation, ROUTES, runPoints, autoBlocks } from './football.js?v=202611211221';
+import { buildDefense } from './defense.js?v=202611211221';
 
 const FIRST = ['Lukas', 'Jonas', 'Ben', 'Elias', 'Noah', 'Paul', 'Leon', 'Finn', 'Luis', 'Felix', 'Henry', 'Emil', 'Anton', 'Theo', 'Mats', 'Jakob',
   'Moritz', 'David', 'Samuel', 'Malik', 'Niklas', 'Tim', 'Ole', 'Karim', 'Milan', 'Jannik', 'Linus', 'Tom', 'Erik', 'Yusuf', 'Hannes', 'Kofi',
@@ -169,11 +169,11 @@ export function demoTeam(team, { level = levelFor(team.name), seed = 7, plays = 
     autoBlocks(offense, run, dir);
     const fb = offense.find(p => p.role === 'FB');
     if (fb && run !== 'Sweep / Toss') { fb.route = runPoints('Iso', dir, fb).slice(0, 1); fb.routeName = 'Lead'; }
-    const concept = ['cover3', 'cover1', 'cover2'][(run.length + dir.length) % 3];
+    const concept = 'cover3';   // Run-Spielzüge: Base 4-3, Cover 3
     return {
       id: uid('play'), teamId: team.id, demo: true, side: 'offense', playType: 'run', runScheme: { run, dir }, name: `${CALL_NAME[formation]} ${run} ${dir}`, formation, offense,
-      offensePersonnelId: off11.id, concept, defensePreset: 'auto', defensePersonnelId: defNickel.id, defenseLocked: false,
-      defense: buildDefense(offense, concept, 'auto').players, duration: 4, notes: 'Beispiel-Spielzug',
+      offensePersonnelId: off11.id, concept, defensePreset: 'base43', defensePersonnelId: null, defenseLocked: false,
+      defense: buildDefense(offense, concept, 'base43').players, duration: 4, notes: 'Beispiel-Spielzug',
     };
   }));
   const defNickelOrBase = personnel.find(p => p.preset === 'base43') || defNickel;

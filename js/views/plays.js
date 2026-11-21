@@ -1,11 +1,11 @@
-import { db, upsert, remove, uid, get } from '../store.js?v=202611211210';
-import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211210';
-import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211210';
-import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211210';
-import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211210';
-import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211210';
-import { scoped, currentTeamId } from '../team.js?v=202611211210';
-import { depthOrder } from './rosters.js?v=202611211210';
+import { db, upsert, remove, uid, get } from '../store.js?v=202611211221';
+import { fullName, athleteSpeedYps } from '../metrics.js?v=202611211221';
+import { esc, modal, toast, confirmDialog, options } from '../ui.js?v=202611211221';
+import { W, CX, HASH_L, HASH_R, FORMATIONS, formationPlayers, ROUTES, routePoints, isEligible, clamp, OFFENSE_PERSONNEL, DEFENSE_PERSONNEL, OFFENSE_CONCEPTS, applyConcept, RUN_PATHS, runPoints, BLOCK_TYPES, autoBlocks, applyRunScheme, isPull, refreshBlock, blockPoints, isLineBlocker, PERS_KEYS, persLabel, personnelOf, familyOf, relRoutes, offenseIn, offenseInFormation } from '../football.js?v=202611211221';
+import { CONCEPTS, ZONES, buildDefense, assignmentLabel } from '../defense.js?v=202611211221';
+import { simulate, sepClass, sepColor, defaultSpeed, DT } from '../sim.js?v=202611211221';
+import { scoped, currentTeamId } from '../team.js?v=202611211221';
+import { depthOrder } from './rosters.js?v=202611211221';
 
 const ROLE_COLOR = { X: '#ffd23f', Z: '#ff8c42', H: '#7bdff2', Y: '#c084fc', U: '#f472b6', F: '#34d399', RB: '#a3e635', FB: '#cbd5e1' };
 const colorOf = p => ROLE_COLOR[p.role] || '#ffd23f';
@@ -110,6 +110,12 @@ function newDefensePlay() {
   });
 }
 
+/** Standard-Defense für Run-Spielzüge: Base 4-3, Cover 3 */
+export function setRunDefense(play) {
+  play.concept = 'cover3'; play.defensePreset = 'base43'; play.defensePersonnelId = null;
+  rebuildDefense(play);
+}
+
 function newPlay() {
   const s = db();
   modal({
@@ -129,7 +135,7 @@ function newPlay() {
         concept: root.querySelector('#c').value, defensePreset: 'auto', defensePersonnelId: null, defenseLocked: false,
         defense: [], duration: 4, notes: '',
       };
-      rebuildDefense(play);
+      if (play.playType === 'run') setRunDefense(play); else rebuildDefense(play);
       upsert('plays', play);
       location.hash = `#/plays/${play.id}`;
     } }],
@@ -727,6 +733,7 @@ ${isDef ? DEFCARD + SELCARD + OFFCARD : OFFCARD + SELCARD + DEFCARD}        <div
   root.querySelectorAll('#typeSeg button').forEach(b => b.onclick = () => {
     play.playType = b.dataset.t;
     root.querySelectorAll('#typeSeg button').forEach(x => x.classList.toggle('on', x === b));
+    if (play.playType === 'run') { setRunDefense(play); $('#conceptSel').value = 'cover3'; if (ed.sel?.side === 'd') ed.sel = null; }
     commit(); toast(b.dataset.t === 'run' ? 'Als Run-Spielzug markiert' : 'Als Pass-Spielzug markiert');
   });
     if ($('#opSel')) $('#opSel').onchange = e => { play.offensePersonnelId = e.target.value || null; commit(); };
